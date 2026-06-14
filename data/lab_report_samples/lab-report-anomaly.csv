@@ -1,0 +1,2 @@
+sampleId,status,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+ANOM-001,anomaly,168,248,8.9,9.6,13.4,520,162,31,248,68,79,2.1,3.0,1.9,38,52,128,5.8,91,18

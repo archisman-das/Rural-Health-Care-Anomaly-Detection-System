@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-102,anomaly,Diabetes Control Panel,"High fasting glucose, high postprandial glucose, and elevated HbA1c.",182,259,9.0,13.4,7.3,252,121,37,218,31,36,0.9,4.0,1.0,18,92,137,4.6,101,23

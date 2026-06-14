@@ -394,7 +394,8 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     els.reloadButton = $("reload-button");
-    els.reloadButton.addEventListener("click", () => loadDashboardData());
-    loadDashboardData();
+    if (els.reloadButton) {
+      els.reloadButton.addEventListener("click", () => loadDashboardData());
+    }
   });
 })();

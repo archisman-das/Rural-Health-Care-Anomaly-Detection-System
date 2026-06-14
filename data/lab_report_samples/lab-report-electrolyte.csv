@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+ELT-509,anomaly,Electrolyte Imbalance Panel,"Sodium, potassium, chloride, and bicarbonate are outside the usual range.",89,120,5.2,14.0,6.9,250,92,52,128,24,20,0.7,4.2,0.9,15,96,129,5.9,92,18

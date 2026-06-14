@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+CBC-204,anomaly,Anemia and CBC Review,Low hemoglobin with higher WBC and platelets.,96,132,5.4,9.4,12.8,510,94,49,130,24,21,0.6,3.8,0.8,14,101,141,4.1,104,25

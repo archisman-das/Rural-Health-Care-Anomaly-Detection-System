@@ -19,6 +19,7 @@ Use the installed entry points to train a model and score new data:
 anomaly-cli train --input train.csv --output artifacts/model.joblib --feature-map artifacts/feature_map.csv --config-json config.json --ensemble-fusion-strategy max_score_voting --ensemble-max-score-threshold 0.8
 anomaly-cli train --synthetic-demo-data --synthetic-demo-rows 9600 --synthetic-demo-seed 42 --no-calibrate-threshold --output artifacts/model.joblib --feature-map artifacts/feature_map.csv --config-json config.json
 anomaly-cli train --input train.csv --output artifacts/model.joblib --config-json config.json --calibrate-threshold --calibration-min-samples 25
+anomaly-cli split-data --input dataset.csv --output-dir data/splits --train-fraction 0.7 --validation-fraction 0.15 --test-fraction 0.15 --group-column patient_id --random-state 42
 anomaly-cli predict --model artifacts/model.joblib --input test.csv --output artifacts/predictions.csv
 anomaly-cli evaluate --input artifacts/predictions.csv --labels-file labels.csv --labels-column label --report-prefix artifacts/report
 anomaly-cli evaluate --input artifacts/predictions.csv --report-prefix artifacts/report
@@ -55,6 +56,7 @@ Dedicated commands are also available:
 anomaly-train --input train.csv --output artifacts/model.joblib --config-json config.json
 anomaly-train --synthetic-demo-data --synthetic-demo-rows 9600 --synthetic-demo-seed 42 --no-calibrate-threshold --output artifacts/model.joblib --config-json config.json
 anomaly-train --input train.csv --output artifacts/model.joblib --config-json config.json --calibrate-threshold --calibration-min-samples 25
+anomaly-cli split-data --input dataset.csv --output-dir data/splits --train-fraction 0.7 --validation-fraction 0.15 --test-fraction 0.15 --group-column patient_id --random-state 42
 anomaly-predict --model artifacts/model.joblib --input test.csv --output artifacts/predictions.csv
 anomaly-evaluate --input artifacts/predictions.csv --labels-file labels.csv --labels-column label --report-prefix artifacts/report
 anomaly-evaluate --input artifacts/predictions.csv --report-prefix artifacts/report

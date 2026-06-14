@@ -13,7 +13,9 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from .config import PreprocessingConfig
 from .pipeline import build_anomaly_pipeline
@@ -30,6 +32,7 @@ _DEFAULT_RISK_SCORING_WEIGHTS = {
     "labs": 0.30,
     "access": 0.15,
 }
+_SPLIT_FILENAMES = ("data.csv", "data.parquet")
 
 
 def _risk_category_from_score(score: float) -> str:
@@ -231,6 +234,313 @@ def _estimate_object_size_bytes(obj: Any) -> int:
     return _walk(obj)
 
 
+def _binary_classification_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    """Return simple binary classification metrics for threshold calibration."""
+
+    true_positive = float(np.sum((y_true == 1) & (y_pred == 1)))
+    true_negative = float(np.sum((y_true == 0) & (y_pred == 0)))
+    false_positive = float(np.sum((y_true == 0) & (y_pred == 1)))
+    false_negative = float(np.sum((y_true == 1) & (y_pred == 0)))
+
+    precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0.0
+    recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0.0
+    f1 = 2.0 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    accuracy = (true_positive + true_negative) / max(1.0, true_positive + true_negative + false_positive + false_negative)
+
+    return {
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1": float(f1),
+        "accuracy": float(accuracy),
+    }
+
+
+def _coerce_binary_labels(labels: Any) -> np.ndarray:
+    """Normalize common binary label encodings into 0/1 integers."""
+
+    array = np.asarray(labels)
+    if array.ndim != 1:
+        array = array.reshape(-1)
+    if array.dtype == bool:
+        return array.astype(int)
+
+    unique_values = set(pd.unique(array).tolist())
+    if unique_values.issubset({0, 1}):
+        return array.astype(int)
+    if unique_values.issubset({-1, 1}):
+        return np.where(array == -1, 1, 0).astype(int)
+    if unique_values.issubset({"0", "1"}):
+        return array.astype(int)
+    raise ValueError("Binary labels must use 0/1, -1/1, or boolean encoding.")
+
+
+def _calibrate_threshold_from_scores(
+    scores: np.ndarray,
+    y_true: np.ndarray,
+    *,
+    candidate_count: int = 201,
+) -> tuple[float, dict[str, float]]:
+    """Find the score cutoff that best matches labeled validation data."""
+
+    if scores.shape[0] != y_true.shape[0]:
+        raise ValueError("scores and y_true must have the same length.")
+    if scores.size == 0:
+        raise ValueError("scores must not be empty.")
+
+    thresholds = np.linspace(0.0, 1.0, max(3, int(candidate_count)), dtype=float)
+    best_threshold = float(thresholds[0])
+    best_metrics = {"precision": 0.0, "recall": 0.0, "f1": -1.0, "accuracy": 0.0}
+    best_key = (-1.0, -1.0, -1.0, -1.0)
+
+    for threshold in thresholds:
+        predicted = (scores >= threshold).astype(int)
+        metrics = _binary_classification_metrics(y_true, predicted)
+        key = (metrics["f1"], metrics["accuracy"], metrics["precision"], float(threshold))
+        if key > best_key:
+            best_key = key
+            best_threshold = float(threshold)
+            best_metrics = metrics
+
+    best_metrics["threshold"] = best_threshold
+    return best_threshold, best_metrics
+
+
+def _load_split_file(split_dir: Path, split_name: str) -> pd.DataFrame | None:
+    candidate_dir = split_dir / split_name
+    if not candidate_dir.exists():
+        return None
+    if candidate_dir.is_file():
+        return load_tabular_data(candidate_dir)
+    for filename in _SPLIT_FILENAMES:
+        candidate_file = candidate_dir / filename
+        if candidate_file.exists():
+            return load_tabular_data(candidate_file)
+    csv_files = sorted(candidate_dir.glob("*.csv"))
+    if csv_files:
+        return load_tabular_data(csv_files[0])
+    parquet_files = sorted(candidate_dir.glob("*.parquet"))
+    if parquet_files:
+        return load_tabular_data(parquet_files[0])
+    return None
+
+
+def load_dataset_split_directory(path: str | Path) -> dict[str, pd.DataFrame]:
+    """Load train/validation/test frames from a split directory."""
+
+    split_dir = Path(path)
+    if not split_dir.exists():
+        raise FileNotFoundError(f"Split directory not found: {split_dir}")
+    if not split_dir.is_dir():
+        raise ValueError(f"Split directory must be a folder: {split_dir}")
+
+    splits: dict[str, pd.DataFrame] = {}
+    for split_name in ("train", "validation", "test"):
+        frame = _load_split_file(split_dir, split_name)
+        if frame is not None:
+            splits[split_name] = frame
+
+    if "train" not in splits:
+        raise ValueError(
+            f"Split directory {split_dir} does not contain a train split. "
+            "Expected a train folder with data.csv or data.parquet."
+        )
+    return splits
+
+
+def _split_indices_by_groups(
+    groups: pd.Series,
+    *,
+    train_fraction: float,
+    validation_fraction: float,
+    test_fraction: float,
+    random_state: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    unique_groups = pd.Index(groups.dropna().astype(str).unique())
+    if unique_groups.size < 3:
+        indices = np.arange(len(groups))
+        if indices.size < 3:
+            return indices, np.asarray([], dtype=int), np.asarray([], dtype=int)
+        train_idx, remainder_idx = train_test_split(
+            indices,
+            test_size=2 / max(3, len(indices)),
+            random_state=random_state,
+            shuffle=True,
+        )
+        val_idx, test_idx = train_test_split(
+            remainder_idx,
+            test_size=0.5,
+            random_state=random_state,
+            shuffle=True,
+        )
+        return np.asarray(train_idx), np.asarray(val_idx), np.asarray(test_idx)
+    if unique_groups.empty:
+        indices = np.arange(len(groups))
+        train_idx, remainder_idx = train_test_split(
+            indices,
+            test_size=max(0.0, validation_fraction + test_fraction),
+            random_state=random_state,
+            shuffle=True,
+        )
+        if validation_fraction + test_fraction <= 0.0 or len(remainder_idx) < 2:
+            return np.asarray(train_idx), np.asarray([], dtype=int), np.asarray([], dtype=int)
+
+        remainder_ratio = test_fraction / max(validation_fraction + test_fraction, 1e-12)
+        val_idx, test_idx = train_test_split(
+            remainder_idx,
+            test_size=remainder_ratio,
+            random_state=random_state,
+            shuffle=True,
+        )
+        return np.asarray(train_idx), np.asarray(val_idx), np.asarray(test_idx)
+
+    rng = np.random.default_rng(random_state)
+    shuffled_groups = unique_groups.to_numpy(copy=True)
+    rng.shuffle(shuffled_groups)
+
+    total_groups = len(shuffled_groups)
+    train_end = max(1, int(round(total_groups * train_fraction)))
+    validation_end = max(train_end + 1, int(round(total_groups * (train_fraction + validation_fraction))))
+    train_end = min(train_end, total_groups)
+    validation_end = min(validation_end, total_groups)
+
+    train_groups = set(shuffled_groups[:train_end].tolist())
+    validation_groups = set(shuffled_groups[train_end:validation_end].tolist())
+    test_groups = set(shuffled_groups[validation_end:].tolist())
+
+    if not validation_groups and test_groups:
+        validation_groups.add(test_groups.pop())
+    if not test_groups and validation_groups:
+        test_groups.add(validation_groups.pop())
+
+    group_values = groups.astype(str).fillna("__missing__")
+    train_idx = np.flatnonzero(group_values.isin(train_groups).to_numpy())
+    validation_idx = np.flatnonzero(group_values.isin(validation_groups).to_numpy())
+    test_idx = np.flatnonzero(group_values.isin(test_groups).to_numpy())
+
+    assigned = set(train_idx.tolist()) | set(validation_idx.tolist()) | set(test_idx.tolist())
+    missing_idx = np.array(sorted(set(range(len(groups))) - assigned), dtype=int)
+    if missing_idx.size:
+        train_idx = np.sort(np.concatenate([train_idx, missing_idx]))
+
+    return np.sort(train_idx), np.sort(validation_idx), np.sort(test_idx)
+
+
+def split_tabular_dataset(
+    data: pd.DataFrame,
+    *,
+    train_fraction: float = 0.7,
+    validation_fraction: float = 0.15,
+    test_fraction: float = 0.15,
+    group_column: str = "patient_id",
+    random_state: int = 42,
+) -> dict[str, pd.DataFrame]:
+    """Split a tabular health dataset into train, validation, and test frames."""
+
+    fractions = np.asarray([train_fraction, validation_fraction, test_fraction], dtype=float)
+    if np.any(~np.isfinite(fractions)) or np.any(fractions < 0):
+        raise ValueError("Split fractions must be finite and non-negative.")
+    total = float(fractions.sum())
+    if total <= 0.0:
+        raise ValueError("At least one split fraction must be greater than zero.")
+    train_fraction, validation_fraction, test_fraction = (fractions / total).tolist()
+
+    if len(data) == 0:
+        empty = data.iloc[0:0].copy()
+        return {"train": empty, "validation": empty, "test": empty}
+    if len(data) < 3:
+        empty = data.iloc[0:0].copy()
+        return {"train": data.copy().reset_index(drop=True), "validation": empty, "test": empty}
+
+    if group_column in data.columns and data[group_column].notna().sum() > 0:
+        train_idx, validation_idx, test_idx = _split_indices_by_groups(
+            data[group_column],
+            train_fraction=train_fraction,
+            validation_fraction=validation_fraction,
+            test_fraction=test_fraction,
+            random_state=random_state,
+        )
+    else:
+        indices = np.arange(len(data))
+        train_idx, remainder_idx = train_test_split(
+            indices,
+            test_size=max(0.0, validation_fraction + test_fraction),
+            random_state=random_state,
+            shuffle=True,
+        )
+        if validation_fraction + test_fraction <= 0.0 or len(remainder_idx) < 2:
+            validation_idx = np.asarray([], dtype=int)
+            test_idx = np.asarray([], dtype=int)
+        else:
+            remainder_ratio = test_fraction / max(validation_fraction + test_fraction, 1e-12)
+            validation_idx, test_idx = train_test_split(
+                remainder_idx,
+                test_size=remainder_ratio,
+                random_state=random_state,
+                shuffle=True,
+            )
+
+    return {
+        "train": data.iloc[np.asarray(train_idx)].copy().reset_index(drop=True),
+        "validation": data.iloc[np.asarray(validation_idx)].copy().reset_index(drop=True),
+        "test": data.iloc[np.asarray(test_idx)].copy().reset_index(drop=True),
+    }
+
+
+def save_dataset_splits(
+    splits: dict[str, pd.DataFrame],
+    output_dir: str | Path,
+    *,
+    filename: str = "data.csv",
+) -> dict[str, str]:
+    """Save train/validation/test splits into separate folders."""
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    manifest: dict[str, str] = {}
+
+    for split_name in ("train", "validation", "test"):
+        if split_name not in splits:
+            continue
+        split_frame = splits[split_name]
+        split_dir = output_path / split_name
+        split_dir.mkdir(parents=True, exist_ok=True)
+        split_file = split_dir / filename
+        split_frame.to_csv(split_file, index=False)
+        manifest[split_name] = str(split_file)
+
+    metadata = {
+        "splits": {name: int(len(frame)) for name, frame in splits.items()},
+        "columns": list(next(iter(splits.values())).columns) if splits else [],
+        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    (output_path / "split_manifest.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    return manifest
+
+
+def prepare_dataset_splits(
+    input_path: str | Path,
+    output_dir: str | Path,
+    *,
+    train_fraction: float = 0.7,
+    validation_fraction: float = 0.15,
+    test_fraction: float = 0.15,
+    group_column: str = "patient_id",
+    random_state: int = 42,
+) -> dict[str, str]:
+    """Load a raw dataset, split it, and write the three folders to disk."""
+
+    data = load_tabular_data(input_path)
+    splits = split_tabular_dataset(
+        data,
+        train_fraction=train_fraction,
+        validation_fraction=validation_fraction,
+        test_fraction=test_fraction,
+        group_column=group_column,
+        random_state=random_state,
+    )
+    return save_dataset_splits(splits, output_dir)
+
+
 def _coerce_list_cell(value: Any) -> Any:
     """Normalize list-like strings into Python lists.
 
@@ -318,6 +628,19 @@ def load_tabular_data(path: str | Path) -> pd.DataFrame:
     """
 
     input_path = Path(path)
+    if input_path.is_dir():
+        for filename in _SPLIT_FILENAMES:
+            candidate = input_path / filename
+            if candidate.exists():
+                return load_tabular_data(candidate)
+        csv_files = sorted(input_path.glob("*.csv"))
+        if csv_files:
+            return load_tabular_data(csv_files[0])
+        parquet_files = sorted(input_path.glob("*.parquet"))
+        if parquet_files:
+            return load_tabular_data(parquet_files[0])
+        raise ValueError(f"Directory {input_path} does not contain a CSV or Parquet file.")
+
     suffix = input_path.suffix.lower()
 
     if suffix == ".csv":
@@ -351,6 +674,65 @@ def train_anomaly_pipeline(
         sample_size = min(25, len(data))
         pipeline.explain_background_ = data.sample(n=sample_size, random_state=42).copy() if len(data) > sample_size else data.copy()
     return pipeline
+
+
+def train_anomaly_pipeline_from_split(
+    split_dir: str | Path,
+    *,
+    label_column: str | None = None,
+    config: PreprocessingConfig | None = None,
+) -> tuple[Any, dict[str, Any]]:
+    """Train on a split directory and optionally calibrate against validation labels."""
+
+    splits = load_dataset_split_directory(split_dir)
+    train_data = splits["train"].copy()
+    validation_data = splits.get("validation")
+    test_data = splits.get("test")
+
+    train_labels = None
+    validation_labels = None
+    test_labels = None
+
+    if label_column:
+        if label_column not in train_data.columns:
+            raise ValueError(f"Label column '{label_column}' was not found in the train split.")
+        train_labels = train_data[label_column]
+        train_data = train_data.drop(columns=[label_column])
+        if validation_data is not None and label_column in validation_data.columns:
+            validation_labels = validation_data[label_column]
+            validation_data = validation_data.drop(columns=[label_column])
+        if test_data is not None and label_column in test_data.columns:
+            test_labels = test_data[label_column]
+            test_data = test_data.drop(columns=[label_column])
+
+    pipeline = train_anomaly_pipeline(train_data, y=train_labels, config=config)
+    metrics: dict[str, Any] = {
+        "train_rows": int(len(train_data)),
+        "validation_rows": int(len(validation_data)) if validation_data is not None else 0,
+        "test_rows": int(len(test_data)) if test_data is not None else 0,
+    }
+
+    if validation_data is not None and validation_labels is not None and len(validation_data) > 0:
+        model = pipeline.named_steps["model"]
+        transformed = pipeline.named_steps["preprocessor"].transform(validation_data)
+        validation_scores = np.asarray(model.raw_anomaly_score(transformed), dtype=float)
+        validation_labels_binary = _coerce_binary_labels(validation_labels)
+        threshold, calibration_metrics = _calibrate_threshold_from_scores(validation_scores, validation_labels_binary)
+        model.offset_ = float(threshold)
+        model.calibrated_threshold_ = float(threshold)
+        model.calibration_metrics_ = calibration_metrics
+        model.calibration_source_ = "validation"
+        metrics["validation_calibration"] = calibration_metrics
+
+    if test_data is not None and len(test_data) > 0 and test_labels is not None:
+        model = pipeline.named_steps["model"]
+        transformed = pipeline.named_steps["preprocessor"].transform(test_data)
+        test_scores = np.asarray(model.raw_anomaly_score(transformed), dtype=float)
+        test_labels_binary = _coerce_binary_labels(test_labels)
+        predictions = (test_scores >= float(getattr(model, "offset_", 0.5))).astype(int)
+        metrics["test_metrics"] = _binary_classification_metrics(test_labels_binary, predictions)
+
+    return pipeline, metrics
 
 
 def save_pipeline(pipeline, output_path: str | Path) -> None:

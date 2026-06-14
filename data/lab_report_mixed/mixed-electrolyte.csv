@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-303,anomaly,Electrolyte Imbalance Panel,"Sodium, potassium, chloride, and bicarbonate are abnormal.",88,122,5.1,14.0,6.5,238,89,54,121,23,19,0.6,4.3,0.8,14,100,129,5.8,91,18

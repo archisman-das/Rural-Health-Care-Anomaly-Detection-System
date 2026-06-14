@@ -29,7 +29,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { useForm, useWatch } from "react-hook-form";
 import * as pdfjsLib from "pdfjs-dist";
 import { z } from "zod";
@@ -74,7 +73,7 @@ const flowSteps = [
     subtitle: "Translate the model output into recommendations, signals, consensus, and feedback.",
     checkpoint: "Disposition and follow-up",
     detail: "This stage turns the analysis into next-step guidance, top contributing signals, and clinician feedback.",
-    nextLabel: "Continue to Backend Processing",
+    nextLabel: "Continue to Model Analytical Hub",
   },
   {
     slug: "backend-processing",
@@ -82,6 +81,7 @@ const flowSteps = [
     subtitle: "Show preprocessing, feature engineering, scaling, and validation steps.",
     checkpoint: "Pipeline trace",
     detail: "The backend view keeps the model-ready data path visible for debugging and trust.",
+    hidden: true,
     nextLabel: "Continue to Model Analytical Hub",
   },
   {
@@ -94,8 +94,9 @@ const flowSteps = [
   },
 ];
 
-const stepIndexBySlug = new Map(flowSteps.map((step, index) => [step.slug, index]));
-const firstStepSlug = flowSteps[0].slug;
+const visibleFlowSteps = flowSteps.filter((step) => !step.hidden);
+const stepIndexBySlug = new Map(visibleFlowSteps.map((step, index) => [step.slug, index]));
+const firstStepSlug = visibleFlowSteps[0].slug;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -108,7 +109,7 @@ const labFieldSpecs = [
     label: "Fasting glucose",
     panel: "diabetes",
     unit: "mg/dL",
-    hint: "Normal: 70-99",
+    hint: "Usually 70 to 99",
     aliases: ["fasting glucose", "fbg", "fasting sugar"],
     defaultValue: "142",
   },
@@ -117,7 +118,7 @@ const labFieldSpecs = [
     label: "Postprandial glucose",
     panel: "diabetes",
     unit: "mg/dL",
-    hint: "Normal: < 140",
+    hint: "Usually under 140",
     aliases: ["postprandial glucose", "pp glucose", "ppbs", "post meal glucose"],
     defaultValue: "208",
   },
@@ -126,7 +127,7 @@ const labFieldSpecs = [
     label: "HbA1c",
     panel: "diabetes",
     unit: "%",
-    hint: "Normal: 4.0-5.6",
+    hint: "Usually 4.0 to 5.6",
     aliases: ["hba1c", "a1c", "glycated hemoglobin"],
     defaultValue: "8.4",
   },
@@ -135,7 +136,7 @@ const labFieldSpecs = [
     label: "Hemoglobin",
     panel: "blood",
     unit: "g/dL",
-    hint: "Typical adult range: 12-17.5",
+    hint: "Usually 12 to 17.5",
     aliases: ["hemoglobin", "hb"],
     defaultValue: "12.1",
   },
@@ -144,7 +145,7 @@ const labFieldSpecs = [
     label: "WBC count",
     panel: "blood",
     unit: "10^3/µL",
-    hint: "Normal: 4-11",
+    hint: "Usually 4 to 11",
     aliases: ["wbc count", "white blood cell count", "wbc"],
     defaultValue: "8.6",
   },
@@ -153,7 +154,7 @@ const labFieldSpecs = [
     label: "Platelet count",
     panel: "blood",
     unit: "10^3/µL",
-    hint: "Normal: 150-450",
+    hint: "Usually 150 to 450",
     aliases: ["platelet count", "platelets", "plt"],
     defaultValue: "265",
   },
@@ -162,7 +163,7 @@ const labFieldSpecs = [
     label: "LDL",
     panel: "lipid",
     unit: "mg/dL",
-    hint: "Target: < 100",
+    hint: "Usually under 100",
     aliases: ["ldl", "ldl cholesterol"],
     defaultValue: "118",
   },
@@ -171,7 +172,7 @@ const labFieldSpecs = [
     label: "HDL",
     panel: "lipid",
     unit: "mg/dL",
-    hint: "Target: > 40",
+    hint: "Usually over 40",
     aliases: ["hdl", "hdl cholesterol"],
     defaultValue: "46",
   },
@@ -180,7 +181,7 @@ const labFieldSpecs = [
     label: "Triglycerides",
     panel: "lipid",
     unit: "mg/dL",
-    hint: "Normal: < 150",
+    hint: "Usually under 150",
     aliases: ["triglycerides", "tg"],
     defaultValue: "174",
   },
@@ -189,7 +190,7 @@ const labFieldSpecs = [
     label: "AST",
     panel: "liver",
     unit: "U/L",
-    hint: "Normal: 10-40",
+    hint: "Usually 10 to 40",
     aliases: ["ast", "sgot"],
     defaultValue: "28",
   },
@@ -198,7 +199,7 @@ const labFieldSpecs = [
     label: "ALT",
     panel: "liver",
     unit: "U/L",
-    hint: "Normal: 7-56",
+    hint: "Usually 7 to 56",
     aliases: ["alt", "sgpt"],
     defaultValue: "32",
   },
@@ -207,7 +208,7 @@ const labFieldSpecs = [
     label: "Bilirubin",
     panel: "liver",
     unit: "mg/dL",
-    hint: "Normal: 0.1-1.2",
+    hint: "Usually 0.1 to 1.2",
     aliases: ["bilirubin", "total bilirubin"],
     defaultValue: "0.8",
   },
@@ -216,7 +217,7 @@ const labFieldSpecs = [
     label: "Albumin",
     panel: "liver",
     unit: "g/dL",
-    hint: "Normal: 3.5-5.0",
+    hint: "Usually 3.5 to 5.0",
     aliases: ["albumin"],
     defaultValue: "4.1",
   },
@@ -225,7 +226,7 @@ const labFieldSpecs = [
     label: "Creatinine",
     panel: "kidney",
     unit: "mg/dL",
-    hint: "Normal: 0.6-1.3",
+    hint: "Usually 0.6 to 1.3",
     aliases: ["creatinine", "serum creatinine", "scr"],
     defaultValue: "0.9",
   },
@@ -234,7 +235,7 @@ const labFieldSpecs = [
     label: "Urea",
     panel: "kidney",
     unit: "mg/dL",
-    hint: "Typical range: 7-20",
+    hint: "Usually 7 to 20",
     aliases: ["urea", "blood urea nitrogen", "bun"],
     defaultValue: "21",
   },
@@ -243,7 +244,7 @@ const labFieldSpecs = [
     label: "eGFR",
     panel: "kidney",
     unit: "mL/min/1.73m²",
-    hint: "Normal: > 90",
+    hint: "Usually over 90",
     aliases: ["egfr", "gfr"],
     defaultValue: "92",
   },
@@ -252,7 +253,7 @@ const labFieldSpecs = [
     label: "Sodium",
     panel: "electrolytes",
     unit: "mmol/L",
-    hint: "Normal: 135-145",
+    hint: "Usually 135 to 145",
     aliases: ["sodium", "na"],
     defaultValue: "139",
   },
@@ -261,7 +262,7 @@ const labFieldSpecs = [
     label: "Potassium",
     panel: "electrolytes",
     unit: "mmol/L",
-    hint: "Normal: 3.5-5.1",
+    hint: "Usually 3.5 to 5.1",
     aliases: ["potassium", "k"],
     defaultValue: "4.2",
   },
@@ -270,7 +271,7 @@ const labFieldSpecs = [
     label: "Chloride",
     panel: "electrolytes",
     unit: "mmol/L",
-    hint: "Normal: 98-107",
+    hint: "Usually 98 to 107",
     aliases: ["chloride", "cl"],
     defaultValue: "102",
   },
@@ -279,7 +280,7 @@ const labFieldSpecs = [
     label: "Bicarbonate",
     panel: "electrolytes",
     unit: "mmol/L",
-    hint: "Normal: 22-29",
+    hint: "Usually 22 to 29",
     aliases: ["bicarbonate", "co2", "hco3"],
     defaultValue: "24",
   },
@@ -294,17 +295,24 @@ const labPanels = [
   { key: "electrolytes", label: "Electrolytes", description: "Core chemistry balance" },
 ];
 
-const labDefaultValues = Object.fromEntries(labFieldSpecs.map((field) => [field.key, field.defaultValue]));
+const labDefaultValues = Object.fromEntries(labFieldSpecs.map((field) => [field.key, ""]));
+
+const requiredLabFieldKeys = new Set(["fastingGlucose", "postprandialGlucose", "hemoglobin"]);
 
 const labSchema = z.object(
   Object.fromEntries(
     labFieldSpecs.map((field) => [
       field.key,
-      z
-        .string()
-        .trim()
-        .min(1, "Required")
-        .refine((value) => !Number.isNaN(Number(value)), "Enter a number"),
+      requiredLabFieldKeys.has(field.key)
+        ? z
+            .string()
+            .trim()
+            .min(1, "Required")
+            .refine((value) => !Number.isNaN(Number(value)), "Enter a number")
+        : z
+            .string()
+            .trim()
+            .refine((value) => value === "" || !Number.isNaN(Number(value)), "Enter a number"),
     ]),
   ),
 );
@@ -342,15 +350,6 @@ const analysisModelCatalog = [
   { key: "ensemble", name: "Ensemble", accuracy: 0.91, precision: 0.89, recall: 0.87, f1: 0.88, auc: 0.94, latencyMs: 10.2, memoryMb: 122 },
 ];
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      retry: 1,
-    },
-  },
-});
-
 const emptyPatientState = {
   demographics: {
     patientId: "",
@@ -374,14 +373,14 @@ const emptyPatientState = {
     socialHistory: "",
   },
   measurements: {
-    heartRate: "84",
-    systolicBp: "136",
-    diastolicBp: "88",
-    spo2: "94",
-    temperature: "37.4",
-    respiratoryRate: "16",
-    weight: "64.2",
-    height: "168",
+    heartRate: "",
+    systolicBp: "",
+    diastolicBp: "",
+    spo2: "",
+    temperature: "",
+    respiratoryRate: "",
+    weight: "",
+    height: "",
   },
   labs: {
     ...labDefaultValues,
@@ -412,8 +411,8 @@ const PatientContext = React.createContext(null);
 
 function getHighestUnlockedIndex(completedSteps) {
   let highest = -1;
-  for (let index = 0; index < flowSteps.length; index += 1) {
-    if (completedSteps.includes(flowSteps[index].slug)) {
+  for (let index = 0; index < visibleFlowSteps.length; index += 1) {
+    if (completedSteps.includes(visibleFlowSteps[index].slug)) {
       highest = index;
       continue;
     }
@@ -548,9 +547,9 @@ function StepLayout({ step, children, nextLabel, nextDisabled, onNext }) {
   const { completedSteps, markStepComplete, highestUnlockedIndex } = usePatient();
   const stepIndex = stepIndexBySlug.get(step.slug) ?? 0;
   const isFirst = stepIndex === 0;
-  const isLast = stepIndex === flowSteps.length - 1;
-  const previousStep = !isFirst ? flowSteps[stepIndex - 1] : null;
-  const nextStep = !isLast ? flowSteps[stepIndex + 1] : null;
+  const isLast = stepIndex === visibleFlowSteps.length - 1;
+  const previousStep = !isFirst ? visibleFlowSteps[stepIndex - 1] : null;
+  const nextStep = !isLast ? visibleFlowSteps[stepIndex + 1] : null;
   const isComplete = completedSteps.includes(step.slug);
 
   const completeAndContinue = () => {
@@ -606,9 +605,9 @@ function StepLayout({ step, children, nextLabel, nextDisabled, onNext }) {
   );
 }
 
-function PageCard({ title, eyebrow, children }) {
+function PageCard({ title, eyebrow, children, compact = false }) {
   return (
-    <article className="card">
+    <article className={`card${compact ? " card--compact" : ""}`}>
       <p className="eyebrow">{eyebrow}</p>
       <h3>{title}</h3>
       <div className="card__body">{children}</div>
@@ -623,16 +622,9 @@ function StepSkeleton({ step, left, right, footer }) {
         <PageCard title="Primary workspace" eyebrow="Active area">
           {left}
         </PageCard>
-        <PageCard title="Supporting context" eyebrow="Reference area">
+        <PageCard title="Supporting context" eyebrow="Reference area" compact>
           {right}
         </PageCard>
-      </div>
-      <div className="card card--wide">
-        <p className="eyebrow">Route notes</p>
-        <div className="route-notes">
-          <p>{step.detail}</p>
-          <p>{footer}</p>
-        </div>
       </div>
     </StepLayout>
   );
@@ -707,11 +699,12 @@ function GraphPanel({ title, subtitle, items, valueKey, valueLabel, reverse = fa
         {items.map((item) => {
           const value = parseNumeric(item[valueKey] ?? 0);
           const width = reverse ? (1 - value / maxValue) * 100 : (value / maxValue) * 100;
+          const barWidth = value <= 0 ? 0 : Math.max(8, width);
           return (
             <div key={item.key || item.label} className="graph-panel__row">
               <div className="graph-panel__label">{item.name || item.label}</div>
               <div className="bar">
-                <span style={{ width: `${Math.max(8, width)}%` }} />
+                <span style={{ width: `${barWidth}%` }} />
               </div>
               <div className="graph-panel__value">
                 {value}
@@ -867,6 +860,237 @@ function HeatmapGrid({ cells }) {
   );
 }
 
+function AnomalyPositionChart({ anomalies }) {
+  const width = 640;
+  const height = 300;
+  const padding = 38;
+  const safeAnomalies = safeArray(anomalies).slice(0, 14);
+  const yBands = ["Vitals", "Blood sugar", "Blood", "Lipids", "Liver", "Kidney", "Electrolytes"];
+  const bandIndex = new Map(yBands.map((band, index) => [band, index]));
+  const points = safeAnomalies.map((item, index) => {
+    const x = padding + clamp01(item.severity) * (width - padding * 2);
+    const yStep = (height - padding * 2) / Math.max(yBands.length - 1, 1);
+    const y = padding + (bandIndex.get(item.domain) ?? index % yBands.length) * yStep;
+    return {
+      ...item,
+      x,
+      y,
+      radius: 6 + clamp01(item.severity) * 12,
+    };
+  });
+  const intakeSourceLabel = "Clinical intake & vitals";
+
+  return (
+    <div className="viz-card viz-card--recharts">
+      <div className="viz-card__head">
+        <div>
+          <strong>Anomaly position map</strong>
+          <p>Shows where each issue sits from low to high severity and by area.</p>
+        </div>
+        <span>{points.length} points</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="viz-svg viz-svg--position" role="img" aria-label="Anomaly position map">
+        <defs>
+          <linearGradient id="positionGridFill" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="rgba(98,212,255,0.06)" />
+            <stop offset="100%" stopColor="rgba(156,241,210,0.14)" />
+          </linearGradient>
+        </defs>
+        <rect x={padding} y={padding} width={width - padding * 2} height={height - padding * 2} rx="18" fill="url(#positionGridFill)" stroke="rgba(185, 201, 225, 0.12)" />
+        {[0.25, 0.5, 0.75].map((mark) => {
+          const x = padding + mark * (width - padding * 2);
+          return <line key={mark} x1={x} x2={x} y1={padding} y2={height - padding} className="viz-threshold viz-threshold--soft" />;
+        })}
+        {yBands.map((band, index) => {
+          const yStep = (height - padding * 2) / Math.max(yBands.length - 1, 1);
+          const y = padding + index * yStep;
+          return (
+            <g key={band}>
+              <text x="12" y={y + 4} className="viz-label viz-label--axis">
+                {band}
+              </text>
+            </g>
+          );
+        })}
+        <text x={width - 22} y={height - 12} className="viz-label viz-label--threshold">
+          Higher severity
+        </text>
+        <text x={padding + 2} y={height - 12} className="viz-label viz-label--axis">
+          Lower severity
+        </text>
+        {points.map((point) => (
+          <g key={`${point.source}-${point.label}`}>
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={point.radius}
+              fill={point.source === intakeSourceLabel ? "#72d7ff" : "#9cf1d2"}
+              stroke="rgba(7,17,29,0.92)"
+              strokeWidth="2"
+            />
+            <text x={point.x + 8} y={point.y - 8} className="viz-label viz-label--position">
+              {point.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div className="viz-foot">
+        <span>Left = low severity</span>
+        <span>Right = high severity</span>
+        <span>Blue = clinical intake & vitals</span>
+        <span>Green = laboratory results</span>
+      </div>
+    </div>
+  );
+}
+
+function AnomalyBubbleCard({ anomalies }) {
+  const items = safeArray(anomalies)
+    .slice(0, 12)
+    .sort((a, b) => b.severity - a.severity);
+
+  return (
+    <div className="viz-card viz-card--recharts">
+      <div className="viz-card__head">
+        <div>
+          <strong>Anomaly bubbles</strong>
+        </div>
+        <span>{items.length} items</span>
+      </div>
+      <div className="anomaly-bubble-grid">
+        {items.length ? (
+          items.map((item) => (
+            <div
+              key={`${item.source}-${item.label}`}
+              className={`anomaly-bubble anomaly-bubble--${item.source === "Clinical intake & vitals" ? "page1" : "page2"}`}
+              style={{
+                width: `${88 + clamp01(item.severity) * 40}px`,
+                height: `${88 + clamp01(item.severity) * 40}px`,
+              }}
+            >
+              <strong>{item.label}</strong>
+              <span>{Math.round(item.severity * 100)}%</span>
+            </div>
+          ))
+        ) : (
+          <div className="anomaly-bubble-empty">No spikes yet</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnomalyRankCard({ anomalies }) {
+  const items = safeArray(anomalies)
+    .slice(0, 8)
+    .sort((a, b) => b.severity - a.severity);
+
+  return (
+    <div className="viz-card viz-card--recharts">
+      <div className="viz-card__head">
+        <div>
+          <strong>Severity ranking</strong>
+        </div>
+        <span>Top {items.length}</span>
+      </div>
+      <div className="severity-rank-list">
+        {items.length ? (
+          items.map((item, index) => (
+            <div key={`${item.source}-${item.label}`} className="severity-rank-row">
+              <span className="severity-rank-row__index">{index + 1}</span>
+              <div className="severity-rank-row__body">
+                <div className="severity-rank-row__label">
+                  <strong>{item.label}</strong>
+                  <span>{item.source}</span>
+                </div>
+                <div className="severity-rank-row__bar">
+                  <i style={{ width: `${Math.max(0, Math.round(clamp01(item.severity) * 100))}%` }} />
+                </div>
+              </div>
+              <strong className="severity-rank-row__value">{Math.round(item.severity * 100)}%</strong>
+            </div>
+          ))
+        ) : (
+          <div className="severity-rank-empty">All values are quiet</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnomalyGaugeCard({ score, riskLevel, totalCount }) {
+  const width = 300;
+  const height = 220;
+  const cx = width / 2;
+  const cy = 160;
+  const radius = 88;
+  const scoreValue = clamp01(score);
+  const startAngle = Math.PI;
+  const endAngle = Math.PI + scoreValue * Math.PI;
+  const arc = (value) => {
+    const angle = startAngle + value * Math.PI;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    return `${x},${y}`;
+  };
+
+  return (
+    <div className="viz-card viz-card--recharts">
+      <div className="viz-card__head">
+        <div>
+          <strong>Anomaly rate gauge</strong>
+          <p>Shows how strong the overall anomaly rate is right now.</p>
+        </div>
+        <span>{riskLevel}</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="viz-svg viz-svg--gauge" role="img" aria-label="Anomaly rate gauge">
+        <path d={`M ${arc(0)} A ${radius} ${radius} 0 0 1 ${arc(1)}`} className="viz-gauge-track" />
+        <path d={`M ${arc(0)} A ${radius} ${radius} 0 ${scoreValue >= 0.5 ? 1 : 0} 1 ${arc(scoreValue)}`} className={`viz-gauge-value viz-gauge-value--${riskLevel.toLowerCase()}`} />
+        <circle cx={cx} cy={cy} r="8" className="viz-gauge-center" />
+        <text x={cx} y="112" textAnchor="middle" className="viz-label viz-label--gauge">
+          {Math.round(scoreValue * 100)}%
+        </text>
+        <text x={cx} y="136" textAnchor="middle" className="viz-label viz-label--gauge-sub">
+          anomaly rate
+        </text>
+      </svg>
+      <div className="viz-foot">
+        <span>Total issues: {totalCount}</span>
+        <span>Rate: {Math.round(scoreValue * 100)}%</span>
+      </div>
+    </div>
+  );
+}
+
+function SourceSplitChart({ page1Count, page2Count }) {
+  const total = Math.max(page1Count + page2Count, 1);
+  const page1 = Math.round((page1Count / total) * 100);
+  const page2 = Math.round((page2Count / total) * 100);
+
+  return (
+    <div className="viz-card viz-card--recharts">
+      <div className="viz-card__head">
+        <div>
+          <strong>Source split</strong>
+        </div>
+        <span>{page1Count + page2Count} issues</span>
+      </div>
+      <div className="source-split">
+        <div className="source-split__row">
+          <span>Clinical intake & vitals</span>
+          <div className="source-split__bar"><i style={{ width: `${page1}%` }} /></div>
+          <strong>{page1Count}</strong>
+        </div>
+        <div className="source-split__row">
+          <span>Laboratory results</span>
+          <div className="source-split__bar"><i style={{ width: `${page2}%` }} /></div>
+          <strong>{page2Count}</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AnomalySummaryStrip({ modelRows }) {
   const strongest = [...modelRows].sort((a, b) => b.score - a.score).slice(0, 4);
   return (
@@ -894,17 +1118,47 @@ function ProgressComparisonCard({ beforeAfter, progression }) {
   const delta = beforeAfter?.delta ?? 0;
   const improving = beforeAfter?.direction === "improving";
   const worsening = beforeAfter?.direction === "worsening";
+  const beforeScore = clamp01(Number(beforeAfter?.beforeScore ?? 0));
+  const afterScore = clamp01(Number(beforeAfter?.afterScore ?? 0));
 
   return (
     <div className="viz-card viz-card--strip">
       <div className="viz-card__head">
         <div>
           <strong>Before / after comparison</strong>
-          <p>How the current run compares to the previous state of the flow.</p>
+          <p>A visual change log showing where the score moved and whether the latest run is cleaner or riskier.</p>
         </div>
         <span className={improving ? "viz-tag viz-tag--good" : worsening ? "viz-tag viz-tag--warn" : "viz-tag"}>
           {beforeAfter?.direction || "baseline"}
         </span>
+      </div>
+      <div className="comparison-highlights comparison-highlights--compact">
+        <div className="comparison-highlight">
+          <span>Before</span>
+          <strong>{Math.round(beforeScore * 100)}%</strong>
+          <small>{beforeAfter?.beforeRisk || "Baseline"}</small>
+        </div>
+        <div className="comparison-highlight">
+          <span>After</span>
+          <strong>{Math.round(afterScore * 100)}%</strong>
+          <small>{beforeAfter?.afterRisk || "Current"}</small>
+        </div>
+        <div className="comparison-highlight">
+          <span>Shift</span>
+          <strong className={improving ? "text-good" : worsening ? "text-warn" : ""}>{delta > 0 ? "+" : ""}{delta.toFixed(2)}</strong>
+          <small>{improving ? "Cleaner than the previous run." : worsening ? "Stronger anomaly signal than before." : "No change between runs."}</small>
+        </div>
+      </div>
+      <div className="compare-bridge">
+        <div className="compare-bridge__rail">
+          <span className="compare-bridge__label">Previous</span>
+          <div className="compare-bridge__bar compare-bridge__bar--before" style={{ width: `${Math.max(10, Math.round(beforeScore * 100))}%` }} />
+        </div>
+        <div className="compare-bridge__arrow">→</div>
+        <div className="compare-bridge__rail">
+          <span className="compare-bridge__label">Current</span>
+          <div className="compare-bridge__bar compare-bridge__bar--after" style={{ width: `${Math.max(10, Math.round(afterScore * 100))}%` }} />
+        </div>
       </div>
       <div className="compare-grid">
         {progression.map((item) => (
@@ -912,6 +1166,9 @@ function ProgressComparisonCard({ beforeAfter, progression }) {
             <span>{item.label}</span>
             <strong>{Math.round(item.score * 100)}%</strong>
             <p>{item.riskLevel}</p>
+            <div className="compare-card__bar">
+              <i style={{ width: `${Math.round(clamp01(item.score) * 100)}%` }} />
+            </div>
           </div>
         ))}
       </div>
@@ -1213,15 +1470,44 @@ function ComparisonRiskMap({ models }) {
 
 function ModelComparisonChart({ models }) {
   const chartData = normalizeComparisonModels(models).sort((a, b) => b.score - a.score);
+  const leader = chartData[0] || null;
+  const trailer = chartData[chartData.length - 1] || null;
+  const scoreSpread = leader && trailer ? Math.max(0, leader.score - trailer.score) : 0;
+  const averageScore = chartData.length
+    ? chartData.reduce((sum, model) => sum + model.score, 0) / chartData.length
+    : 0;
+  const strongModels = chartData.filter((model) => model.score >= 0.85).length;
 
   return (
     <div className="viz-card viz-card--recharts">
       <div className="viz-card__head">
         <div>
           <strong>Model metric comparison</strong>
-          <p>Accuracy, precision, recall, and comparative score shown side by side.</p>
+          <p>Each bar set shows how quality changes across models, with the strongest detector pinned to the top.</p>
         </div>
         <span>{chartData.length} models</span>
+      </div>
+      <div className="comparison-highlights">
+        <div className="comparison-highlight">
+          <span>Leader</span>
+          <strong>{leader?.name || "Locked"}</strong>
+          <small>{leader ? `${Math.round(leader.score * 100)}% comparative score` : "Run the analysis to populate the ranking."}</small>
+        </div>
+        <div className="comparison-highlight">
+          <span>Score spread</span>
+          <strong>{Math.round(scoreSpread * 100)}%</strong>
+          <small>Gap between the top and bottom model scores.</small>
+        </div>
+        <div className="comparison-highlight">
+          <span>Average score</span>
+          <strong>{Math.round(averageScore * 100)}%</strong>
+          <small>Midpoint across all detectors in the matrix.</small>
+        </div>
+        <div className="comparison-highlight">
+          <span>Strong models</span>
+          <strong>{strongModels}</strong>
+          <small>Models at or above 85% comparative score.</small>
+        </div>
       </div>
       <div className="recharts-box">
         <ResponsiveContainer width="100%" height={320}>
@@ -1255,6 +1541,10 @@ function ModelComparisonChart({ models }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      <div className="comparison-matrix-note">
+        <strong>How to read it:</strong>
+        <span>The green bar is the combined score. Blue, orange, and pink show precision, recall, and accuracy so you can spot the balance, not just the winner.</span>
+      </div>
     </div>
   );
 }
@@ -1262,15 +1552,32 @@ function ModelComparisonChart({ models }) {
 function ModelComparisonTable({ models }) {
   const rows = normalizeComparisonModels(models).sort((a, b) => b.score - a.score);
   const bestKey = rows[0]?.key;
+  const fastest = [...rows].sort((a, b) => (a.latencyMs ?? Number.POSITIVE_INFINITY) - (b.latencyMs ?? Number.POSITIVE_INFINITY))[0] || null;
+  const lightest = [...rows].sort((a, b) => (a.memoryMb ?? Number.POSITIVE_INFINITY) - (b.memoryMb ?? Number.POSITIVE_INFINITY))[0] || null;
+  const bestTradeoff = rows[0] || null;
 
   return (
     <section className="model-comparison-table">
       <div className="viz-card__head">
         <div>
           <strong>Model comparison table</strong>
-          <p>Sorted performance view with ML and DL badges for faster scanning.</p>
+          <p>Sorted performance view with leader highlights, cost signals, and family badges for quick reading.</p>
         </div>
         <span>{rows.length} models</span>
+      </div>
+      <div className="comparison-table-summary">
+        <div className="comparison-table-summary__item">
+          <span>Best score</span>
+          <strong>{bestTradeoff?.name || "Locked"}</strong>
+        </div>
+        <div className="comparison-table-summary__item">
+          <span>Fastest</span>
+          <strong>{fastest?.name || "Locked"}</strong>
+        </div>
+        <div className="comparison-table-summary__item">
+          <span>Lightest</span>
+          <strong>{lightest?.name || "Locked"}</strong>
+        </div>
       </div>
       <div className="model-comparison-table__wrap">
         <table>
@@ -1310,6 +1617,9 @@ function ModelComparisonTable({ models }) {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="comparison-table-footnote">
+        The top row is the current leader, while the latency and memory columns show how expensive each model is to keep online.
       </div>
     </section>
   );
@@ -1690,7 +2000,7 @@ function DecisionConsensusCard({ models }) {
       <div className="viz-card__head">
         <div>
           <strong>Model consensus display</strong>
-          <p>Top models are grouped to show how strongly the ensemble agrees on the current decision.</p>
+          <p>Top models are grouped to show how strongly the ensemble agrees.</p>
         </div>
         <span>{Math.round(consensusScore * 100)}% consensus</span>
       </div>
@@ -1836,7 +2146,7 @@ function FeatureEngineeringChart({ features }) {
       <div className="viz-card__head">
         <div>
           <strong>Feature engineering output</strong>
-          <p>Derived features are normalized so the backend can score them consistently.</p>
+          <p>Derived features are normalized so the model processing hub can score them consistently.</p>
         </div>
         <span>{chartData.length} features</span>
       </div>
@@ -2084,7 +2394,7 @@ function buildFeatureEngineeringPipeline(patient) {
     {
       name: "Bundle for scoring",
       status: "ready",
-      detail: "The final feature bundle is ready for the backend model hub.",
+      detail: "The final feature bundle is ready for the model processing hub.",
       outputCount: engineeredFeatures.length + encodedFeatures.length + 4,
     },
   ];
@@ -2154,7 +2464,7 @@ function findLabField(key) {
 
 function formatRangeHint(field, value) {
   if (!field || value === "" || Number.isNaN(Number(value))) {
-    return "";
+    return field?.hint || "";
   }
 
   const numeric = Number(value);
@@ -2188,10 +2498,497 @@ function formatRangeHint(field, value) {
 
   const [low, high] = range;
   if (high === Infinity) {
-    return numeric >= low ? `Normal: > ${low}` : field.hint;
+    return numeric >= low ? `Usually over ${low}` : field.hint;
   }
 
-  return `Normal: ${low}-${high}`;
+  return `Usually ${low} to ${high}`;
+}
+
+const careInsightRanges = {
+  fastingGlucose: [70, 99],
+  postprandialGlucose: [0, 140],
+  hba1c: [4.0, 5.6],
+  hemoglobin: [12.0, 17.5],
+  wbcCount: [4.0, 11.0],
+  plateletCount: [150, 450],
+  ldl: [0, 100],
+  hdl: [40, Infinity],
+  triglycerides: [0, 150],
+  ast: [10, 40],
+  alt: [7, 56],
+  bilirubin: [0.1, 1.2],
+  albumin: [3.5, 5.0],
+  creatinine: [0.6, 1.3],
+  urea: [7, 20],
+  egfr: [90, Infinity],
+  sodium: [135, 145],
+  potassium: [3.5, 5.1],
+  chloride: [98, 107],
+  bicarbonate: [22, 29],
+  heartRate: [60, 100],
+  systolicBp: [90, 140],
+  diastolicBp: [60, 90],
+  spo2: [95, 100],
+  temperature: [36.1, 37.2],
+  respiratoryRate: [12, 20],
+};
+
+function getPlainRangeLabel([low, high]) {
+  if (high === Infinity) {
+    return `Usually over ${low}`;
+  }
+  return `Usually ${low} to ${high}`;
+}
+
+function buildPatientCareInsights(patient) {
+  const demographics = patient.demographics || {};
+  const visit = patient.visit || {};
+  const medicalHistory = patient.medicalHistory || {};
+  const measurements = patient.measurements || {};
+  const labs = patient.labs || {};
+  const intakeSourceLabel = "Clinical intake & vitals";
+  const labSourceLabel = "Laboratory results";
+  const isFilled = (value) => String(value ?? "").trim() !== "";
+  const hasPage1Data = [
+    demographics.patientId,
+    demographics.fullName,
+    demographics.age,
+    visit.chiefComplaint,
+    visit.visitDate,
+    medicalHistory.comorbidities,
+    medicalHistory.currentMedications,
+    medicalHistory.allergies,
+    medicalHistory.familyHistory,
+    medicalHistory.socialHistory,
+    measurements.heartRate,
+    measurements.systolicBp,
+    measurements.diastolicBp,
+    measurements.spo2,
+    measurements.temperature,
+    measurements.respiratoryRate,
+    measurements.weight,
+    measurements.height,
+  ].some((value) => String(value ?? "").trim() !== "");
+  const hasPage2Data = Object.values(labs).some((value) => String(value ?? "").trim() !== "");
+
+  if (!hasPage1Data || !hasPage2Data) {
+    const zeroDomains = ["Vitals", "Blood sugar", "Blood", "Lipids", "Liver", "Kidney", "Electrolytes"].map((label) => ({
+      label,
+      value: 0,
+      count: 0,
+    }));
+    return {
+      anomalies: [],
+      domainScores: zeroDomains,
+      heatmapCells: zeroDomains.map((item) => ({
+        label: item.label,
+        value: 0,
+        tone: "moderate",
+      })),
+      radarMetrics: zeroDomains.map((item) => ({
+        label: item.label,
+        value: 0,
+      })),
+      riskLevel: "Low",
+      summary: [],
+      suggestionSet: [],
+      totalSeverity: 0,
+      page1Anomalies: 0,
+      page2Anomalies: 0,
+      trendSeries: Array.from({ length: 8 }, (_, index) => ({
+        label: `${index + 1}`,
+        score: 0,
+      })),
+    };
+  }
+
+  const bmiWeight = parseNumeric(measurements.weight);
+  const bmiHeightMeters = parseNumeric(measurements.height) / 100;
+  const bmi = bmiWeight > 0 && bmiHeightMeters > 0 ? bmiWeight / (bmiHeightMeters * bmiHeightMeters) : 0;
+
+  const checks = [
+    {
+      source: intakeSourceLabel,
+      domain: "Intake",
+      label: "Age",
+      value: demographics.age,
+      required: true,
+      suggestion: "Add the age so the summary uses the right age group.",
+    },
+    {
+      source: intakeSourceLabel,
+      domain: "Intake",
+      label: "Symptom duration",
+      value: visit.symptomOnset,
+      required: true,
+      suggestion: "Add how long the symptom has been going on.",
+    },
+    {
+      source: intakeSourceLabel,
+      domain: "Intake",
+      label: "Comorbidities",
+      value: medicalHistory.comorbidities,
+      required: true,
+      suggestion: "List the other health conditions the patient already has.",
+    },
+    {
+      source: intakeSourceLabel,
+      domain: "Vitals",
+      label: "Heart rate",
+      value: measurements.heartRate,
+      required: true,
+      min: careInsightRanges.heartRate[0],
+      max: careInsightRanges.heartRate[1],
+      suggestion: "Add the pulse reading so the vital check is complete.",
+    },
+    {
+      source: intakeSourceLabel,
+      domain: "Vitals",
+      label: "Blood pressure",
+      value: measurements.systolicBp && measurements.diastolicBp ? `${measurements.systolicBp}/${measurements.diastolicBp}` : "",
+      required: true,
+      min: careInsightRanges.systolicBp[0],
+      max: careInsightRanges.systolicBp[1],
+      scoreValue: parseNumeric(measurements.systolicBp),
+      suggestion: "Enter both blood pressure numbers so the reading is usable.",
+    },
+    {
+      source: intakeSourceLabel,
+      domain: "Vitals",
+      label: "SpO2",
+      value: measurements.spo2,
+      required: true,
+      min: careInsightRanges.spo2[0],
+      max: careInsightRanges.spo2[1],
+      suggestion: "Add the oxygen level reading so breathing risk is clearer.",
+    },
+    {
+      source: intakeSourceLabel,
+      domain: "Vitals",
+      label: "Body temperature",
+      value: measurements.temperature,
+      required: true,
+      min: careInsightRanges.temperature[0],
+      max: careInsightRanges.temperature[1],
+      suggestion: "Add the body temperature reading.",
+    },
+    {
+      source: intakeSourceLabel,
+      domain: "Vitals",
+      label: "Respiratory rate",
+      value: measurements.respiratoryRate,
+      required: true,
+      min: careInsightRanges.respiratoryRate[0],
+      max: careInsightRanges.respiratoryRate[1],
+      suggestion: "Add the breathing rate reading.",
+    },
+    {
+      source: intakeSourceLabel,
+      domain: "Vitals",
+      label: "Body size",
+      value: bmi > 0 ? bmi.toFixed(1) : "",
+      min: 18.5,
+      max: 24.9,
+      scoreValue: bmi,
+      suggestion: "Use weight and height to review body size and general risk.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Blood sugar",
+      label: "Fasting glucose",
+      value: labs.fastingGlucose,
+      min: careInsightRanges.fastingGlucose[0],
+      max: careInsightRanges.fastingGlucose[1],
+      required: true,
+      suggestion: "Review meals, medicines, and blood sugar control.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Blood sugar",
+      label: "After-meal glucose",
+      value: labs.postprandialGlucose,
+      min: careInsightRanges.postprandialGlucose[0],
+      max: careInsightRanges.postprandialGlucose[1],
+      required: true,
+      suggestion: "Check whether the reading was taken after a recent meal.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Blood sugar",
+      label: "HbA1c",
+      value: labs.hba1c,
+      min: careInsightRanges.hba1c[0],
+      max: careInsightRanges.hba1c[1],
+      suggestion: "Use this to review longer-term sugar control.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Blood",
+      label: "Hemoglobin",
+      value: labs.hemoglobin,
+      min: careInsightRanges.hemoglobin[0],
+      max: careInsightRanges.hemoglobin[1],
+      required: true,
+      suggestion: "Check for tiredness, bleeding, or low blood count.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Blood",
+      label: "White cell count",
+      value: labs.wbcCount,
+      min: careInsightRanges.wbcCount[0],
+      max: careInsightRanges.wbcCount[1],
+      suggestion: "Look for infection or recent inflammation.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Blood",
+      label: "Platelets",
+      value: labs.plateletCount,
+      min: careInsightRanges.plateletCount[0],
+      max: careInsightRanges.plateletCount[1],
+      suggestion: "Check for easy bruising or recent bleeding.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Lipids",
+      label: "LDL",
+      value: labs.ldl,
+      min: careInsightRanges.ldl[0],
+      max: careInsightRanges.ldl[1],
+      suggestion: "Review heart health and diet advice.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Lipids",
+      label: "HDL",
+      value: labs.hdl,
+      min: careInsightRanges.hdl[0],
+      max: careInsightRanges.hdl[1],
+      suggestion: "A lower-than-expected level may mean extra heart risk.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Lipids",
+      label: "Triglycerides",
+      value: labs.triglycerides,
+      min: careInsightRanges.triglycerides[0],
+      max: careInsightRanges.triglycerides[1],
+      suggestion: "Check recent meals, sugar intake, and weight changes.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Liver",
+      label: "AST",
+      value: labs.ast,
+      min: careInsightRanges.ast[0],
+      max: careInsightRanges.ast[1],
+      suggestion: "Review liver health, medicines, and alcohol use.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Liver",
+      label: "ALT",
+      value: labs.alt,
+      min: careInsightRanges.alt[0],
+      max: careInsightRanges.alt[1],
+      suggestion: "Check for liver stress or medication effects.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Liver",
+      label: "Bilirubin",
+      value: labs.bilirubin,
+      min: careInsightRanges.bilirubin[0],
+      max: careInsightRanges.bilirubin[1],
+      suggestion: "Look for signs of jaundice or blocked bile flow.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Kidney",
+      label: "Creatinine",
+      value: labs.creatinine,
+      min: careInsightRanges.creatinine[0],
+      max: careInsightRanges.creatinine[1],
+      suggestion: "Review kidney function and hydration.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Kidney",
+      label: "Urea",
+      value: labs.urea,
+      min: careInsightRanges.urea[0],
+      max: careInsightRanges.urea[1],
+      suggestion: "Check fluid intake and kidney strain.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Kidney",
+      label: "eGFR",
+      value: labs.egfr,
+      min: careInsightRanges.egfr[0],
+      max: careInsightRanges.egfr[1],
+      suggestion: "A lower value may mean kidney function needs a closer look.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Electrolytes",
+      label: "Sodium",
+      value: labs.sodium,
+      min: careInsightRanges.sodium[0],
+      max: careInsightRanges.sodium[1],
+      suggestion: "Check fluid balance and salt intake.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Electrolytes",
+      label: "Potassium",
+      value: labs.potassium,
+      min: careInsightRanges.potassium[0],
+      max: careInsightRanges.potassium[1],
+      suggestion: "Review kidney health and medicines that affect potassium.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Electrolytes",
+      label: "Chloride",
+      value: labs.chloride,
+      min: careInsightRanges.chloride[0],
+      max: careInsightRanges.chloride[1],
+      suggestion: "Check salt balance and hydration.",
+    },
+    {
+      source: labSourceLabel,
+      domain: "Electrolytes",
+      label: "Bicarbonate",
+      value: labs.bicarbonate,
+      min: careInsightRanges.bicarbonate[0],
+      max: careInsightRanges.bicarbonate[1],
+      suggestion: "Look for a body chemistry imbalance.",
+    },
+  ];
+
+  const anomalies = checks
+    .map((check) => {
+      const rawValue = check.value;
+      const comparableValue = check.scoreValue ?? rawValue;
+      const numeric = Number(comparableValue);
+      const missing = !isFilled(rawValue);
+      const rangeDefined = Number.isFinite(check.min) || Number.isFinite(check.max);
+      let severity = 0;
+      let status = "ok";
+      let note = "";
+
+      if (missing) {
+        if (!check.required) {
+          return null;
+        }
+        severity = 0.72;
+        status = "needs attention";
+        note = "This field is still blank.";
+      } else if (Number.isFinite(numeric) && rangeDefined) {
+        const below = Number.isFinite(check.min) ? Math.max(0, (check.min - numeric) / Math.max(check.min, 1)) : 0;
+        const above = Number.isFinite(check.max) ? Math.max(0, (numeric - check.max) / Math.max(check.max, 1)) : 0;
+        severity = clamp01(Math.max(below, above));
+        if (severity > 0) {
+          status = severity >= 0.45 ? "needs attention" : "watch";
+          if (Number.isFinite(check.max) && numeric > check.max) {
+            note = Number.isFinite(check.min)
+              ? `Higher than the usual range of ${getPlainRangeLabel([check.min, check.max])}.`
+              : `Higher than the usual limit of ${check.max}.`;
+          } else {
+            note = Number.isFinite(check.min)
+              ? `Lower than the usual range of ${getPlainRangeLabel([check.min, check.max])}.`
+              : `Lower than the usual limit of ${check.min}.`;
+          }
+        }
+      }
+
+      if (!severity) {
+        return null;
+      }
+
+      return {
+        ...check,
+        severity,
+        status,
+        note: note || check.suggestion,
+        valueLabel: missing ? "Missing" : check.label === "Blood pressure" ? `${measurements.systolicBp || "?"}/${measurements.diastolicBp || "?"}` : String(rawValue),
+      };
+    })
+    .filter(Boolean)
+    .filter(Boolean)
+    .sort((a, b) => b.severity - a.severity);
+
+  const domainBuckets = ["Vitals", "Blood sugar", "Blood", "Lipids", "Liver", "Kidney", "Electrolytes"];
+  const domainScores = domainBuckets.map((domain) => {
+    const domainChecks = anomalies.filter((item) => item.domain === domain);
+    const score = domainChecks.length
+      ? domainChecks.reduce((sum, item) => sum + item.severity, 0) / domainChecks.length
+      : 0;
+    return {
+      label: domain,
+      value: clamp01(score),
+      count: domainChecks.length,
+    };
+  });
+
+  const page1Anomalies = anomalies.filter((item) => item.source === intakeSourceLabel).length;
+  const page2Anomalies = anomalies.filter((item) => item.source === labSourceLabel).length;
+  const totalSeverity = anomalies.length
+    ? anomalies.reduce((sum, item) => sum + item.severity, 0) / anomalies.length
+    : 0;
+  const riskLevel = totalSeverity >= 0.55 ? "High" : totalSeverity >= 0.28 ? "Medium" : "Low";
+  const suggestionSet = [
+    anomalies.some((item) => item.domain === "Intake")
+      ? "Finish the blank intake fields so the record is complete."
+      : "The basic intake looks complete.",
+    anomalies.some((item) => item.domain === "Vitals")
+      ? "Repeat the vital signs that are outside the usual range."
+      : "The vital signs do not show a major concern right now.",
+    anomalies.some((item) => item.domain === "Blood sugar")
+      ? "Review blood sugar control, meal timing, and medicine use."
+      : "Blood sugar values are not standing out right now.",
+    anomalies.some((item) => item.domain === "Kidney" || item.domain === "Electrolytes")
+      ? "Watch hydration and review kidney-related results."
+      : "Kidney and salt balance look steady.",
+  ];
+
+  const trendSeries = anomalies.slice(0, 8).map((item, index) => ({
+    label: `${index + 1}`,
+    score: clamp01(item.severity),
+  }));
+
+  const heatmapCells = anomalies.slice(0, 9).map((item, index) => ({
+    label: item.label,
+    value: item.severity,
+    tone: index < 3 ? "critical" : index < 6 ? "elevated" : "moderate",
+  }));
+
+  const radarMetrics = domainScores.map((item) => ({
+    label: item.label,
+    value: item.value,
+  }));
+
+  const summary = [
+    `${anomalies.length} issue${anomalies.length === 1 ? "" : "s"} found after reviewing clinical intake, vitals, and lab results.`,
+    `${page1Anomalies} issue${page1Anomalies === 1 ? "" : "s"} came from clinical intake and vitals.`,
+    `${page2Anomalies} issue${page2Anomalies === 1 ? "" : "s"} came from laboratory results.`,
+  ];
+
+  return {
+    anomalies,
+    domainScores,
+    heatmapCells,
+    radarMetrics,
+    riskLevel,
+    summary,
+    suggestionSet,
+    totalSeverity,
+    page1Anomalies,
+    page2Anomalies,
+    trendSeries,
+  };
 }
 
 function LabField({ field, register, error, value, onAutoFill }) {
@@ -2237,7 +3034,7 @@ function LabField({ field, register, error, value, onAutoFill }) {
       <input
         type="number"
         step="any"
-        placeholder={field.defaultValue}
+        placeholder={`Type a number, like ${field.defaultValue}`}
         {...registration}
         onChange={(event) => {
           registration.onChange(event);
@@ -2246,6 +3043,7 @@ function LabField({ field, register, error, value, onAutoFill }) {
           }
         }}
       />
+      <span className="lab-field__help">Use the number from the report.</span>
       <div className="lab-field__meta">
         <span className={`lab-range${withinRange === null ? "" : withinRange ? " is-good" : " is-warn"}`}>
           {hint}
@@ -2608,65 +3406,72 @@ function getRiskAction(riskLevel) {
   };
 }
 
-function getImmediateRecommendations(riskLevel) {
+function buildDecisionSupportGuidance({ riskLevel, topSignals, comparisonRows, consensusScore, consensusSpread }) {
+  const topSignalNames = safeArray(topSignals)
+    .map((signal) => signal.feature || signal.name)
+    .filter(Boolean)
+    .slice(0, 3);
+  const leaderName = comparisonRows[0]?.name || "the leading detector";
+  const trendDescriptor = consensusSpread >= 0.12 ? "closely grouped" : "spread out";
+
+  const immediateRecommendations = [];
+  const followUpPlan = [];
+  const references = [];
+
   if (riskLevel === "High") {
-    return [
-      "Check airway, breathing, circulation, and acute red flags before discharge.",
-      "Confirm medication adherence and the timing of the last dose taken.",
-      "Escalate to a higher-level facility or clinician if symptoms worsen.",
-      "Repeat key vitals and urgent labs if the clinical picture is changing.",
-    ];
-  }
-  if (riskLevel === "Medium") {
-    return [
-      "Review the abnormal values with the patient or caregiver before they leave.",
-      "Give clear instructions on hydration, diet, medication adherence, and warning signs.",
-      "Arrange a short-interval reassessment or callback.",
+    immediateRecommendations.push(
+      `Act on the highest-risk findings now, especially ${topSignalNames[0] || "the strongest abnormal signal"}.`,
+      "Confirm the patient is safe for discharge or needs urgent review.",
+      "Recheck the key abnormal vitals and labs before the patient leaves.",
+      "Escalate to a clinician or higher-level facility without delay if symptoms are worsening.",
+    );
+    followUpPlan.push(
+      "Same-day clinician review or direct handoff.",
+      "Document who received the escalation and when.",
+      "Arrange a very short follow-up if the patient is not immediately transferred.",
+    );
+  } else if (riskLevel === "Medium") {
+    immediateRecommendations.push(
+      `Review the main abnormal items now, starting with ${topSignalNames[0] || "the strongest signal"}.`,
+      "Explain the result to the patient in plain language.",
+      "Repeat the most relevant vital signs and lab checks soon.",
       "Document any barriers to care, transport, or medicine access.",
-    ];
+    );
+    followUpPlan.push(
+      "Short-interval follow-up in a few days.",
+      "Repeat the values that moved the score the most.",
+      "Watch for any new symptoms or worsening numbers.",
+    );
+  } else {
+    immediateRecommendations.push(
+      "Share the result clearly and keep the patient on routine monitoring.",
+      "Point out the reassuring values and the areas that stayed stable.",
+      "Continue the current plan unless new symptoms appear.",
+      "Give the patient a simple contact path if anything changes.",
+    );
+    followUpPlan.push(
+      "Routine revisit at the next scheduled screening.",
+      "Recheck the same values at standard intervals.",
+      "Escalate only if new symptoms or new abnormal values appear.",
+    );
   }
-  return [
-    "Share a concise explanation of the score and the main reassuring findings.",
-    "Keep the patient on the routine monitoring pathway.",
-    "Encourage continuation of current therapy and healthy follow-up habits.",
-    "Provide a clear contact route if symptoms change.",
-  ];
-}
 
-function getFollowUpPlan(riskLevel) {
-  if (riskLevel === "High") {
-    return [
-      "Same-day referral or direct clinician review.",
-      "Document the receiving destination and handoff contact.",
-      "Arrange follow-up within 24-48 hours if referral is delayed.",
-    ];
+  references.push(
+    `${leaderName} is currently leading the comparison, and the models are ${trendDescriptor}.`,
+    `Consensus sits at ${Math.round(consensusScore * 100)}%, so the next step should match the overall agreement level.`,
+  );
+
+  if (topSignalNames.length) {
+    references.push(`Top signals to watch: ${topSignalNames.join(", ")}.`);
   }
-  if (riskLevel === "Medium") {
-    return [
-      "Short-interval follow-up in 3-7 days.",
-      "Repeat the most relevant abnormal labs and vitals.",
-      "Review medication adherence and symptom trend.",
-    ];
-  }
-  return [
-    "Routine revisit at the next scheduled screening visit.",
-    "Recheck vitals and key labs at standard intervals.",
-    "Escalate only if new symptoms or worsening values appear.",
-  ];
-}
 
-function getReferences() {
-  return [
-    "ADA Standards of Care in Diabetes",
-    "WHO clinical screening and referral guidance",
-    "Local lab reference intervals and escalation protocol",
-    "Primary care follow-up and documentation policy",
-  ];
-}
+  references.push("Use the lab and vital reference ranges already loaded in this dashboard.");
 
-async function fetchAnalysisDataset() {
-  const response = await axios.get("/dashboard-data.json");
-  return response.data;
+  return {
+    immediateRecommendations,
+    followUpPlan,
+    references,
+  };
 }
 
 function safeArray(value) {
@@ -2737,21 +3542,28 @@ function PatientDetailsPage() {
   const step = flowSteps[0];
   const weight = Number(patient.measurements.weight);
   const heightMeters = Number(patient.measurements.height) / 100;
-  const bmi = weight > 0 && heightMeters > 0 ? (weight / (heightMeters * heightMeters)).toFixed(1) : "—";
+  const bmi = weight > 0 && heightMeters > 0 ? (weight / (heightMeters * heightMeters)).toFixed(2) : "0.00";
   const requiredIntakeFields = React.useMemo(
     () => [
-      { label: "Patient ID", value: patient.demographics.patientId },
-      { label: "Full name", value: patient.demographics.fullName },
       { label: "Age", value: patient.demographics.age },
-      { label: "Chief complaint", value: patient.visit.chiefComplaint },
-      { label: "Visit date", value: patient.visit.visitDate },
+      { label: "Symptom duration", value: patient.visit.symptomOnset },
+      { label: "Comorbidities", value: patient.medicalHistory.comorbidities },
+      { label: "Heart rate", value: patient.measurements.heartRate },
+      { label: "Blood pressure", value: patient.measurements.systolicBp && patient.measurements.diastolicBp ? `${patient.measurements.systolicBp}/${patient.measurements.diastolicBp}` : "" },
+      { label: "SpO2", value: patient.measurements.spo2 },
+      { label: "Body temperature", value: patient.measurements.temperature },
+      { label: "Respiratory rate", value: patient.measurements.respiratoryRate },
     ],
     [
       patient.demographics.age,
-      patient.demographics.fullName,
-      patient.demographics.patientId,
-      patient.visit.chiefComplaint,
-      patient.visit.visitDate,
+      patient.measurements.diastolicBp,
+      patient.measurements.heartRate,
+      patient.measurements.respiratoryRate,
+      patient.measurements.spo2,
+      patient.measurements.systolicBp,
+      patient.measurements.temperature,
+      patient.medicalHistory.comorbidities,
+      patient.visit.symptomOnset,
     ],
   );
   const missingRequiredFields = requiredIntakeFields.filter((field) => !String(field.value || "").trim());
@@ -2788,7 +3600,7 @@ function PatientDetailsPage() {
           <SectionCard
             eyebrow="Profile"
             title="Patient profile"
-            description="Basic identity and encounter details that anchor the rest of the flow."
+            description="Basic details can be added if helpful, but the required clinical inputs are what unlock the next step."
           >
             <TwoColumnFields>
               <label>
@@ -2796,7 +3608,7 @@ function PatientDetailsPage() {
                 <input
                   value={patient.demographics.patientId}
                   onChange={(e) => updateSection("demographics", { patientId: e.target.value })}
-                  placeholder="RH-2048"
+                  placeholder="Type the patient ID"
                 />
               </label>
               <label>
@@ -2804,7 +3616,7 @@ function PatientDetailsPage() {
                 <input
                   value={patient.demographics.fullName}
                   onChange={(e) => updateSection("demographics", { fullName: e.target.value })}
-                  placeholder="Amina Rahman"
+                  placeholder="Type the person's name"
                 />
               </label>
               <label>
@@ -2813,7 +3625,7 @@ function PatientDetailsPage() {
                   type="number"
                   value={patient.demographics.age}
                   onChange={(e) => updateSection("demographics", { age: e.target.value })}
-                  placeholder="54"
+                  placeholder="Type age in years"
                 />
               </label>
               <label>
@@ -2842,7 +3654,7 @@ function PatientDetailsPage() {
           <SectionCard
             eyebrow="Clinical visit"
             title="Visit summary"
-            description="Capture the current complaint and the context of the encounter."
+            description="Capture the symptom timing and the context of the encounter."
           >
             <div className="form-grid">
               <label>
@@ -2851,16 +3663,16 @@ function PatientDetailsPage() {
                   rows="4"
                   value={patient.visit.chiefComplaint}
                   onChange={(e) => updateSection("visit", { chiefComplaint: e.target.value })}
-                  placeholder="Fever, fatigue, and reduced appetite over the last 5 days."
+                  placeholder="Tell us what is bothering the patient."
                 />
               </label>
               <TwoColumnFields>
                 <label>
-                  <span>Symptom onset</span>
+                  <span>Symptom duration</span>
                   <input
                     value={patient.visit.symptomOnset}
                     onChange={(e) => updateSection("visit", { symptomOnset: e.target.value })}
-                    placeholder="5 days"
+                    placeholder="How long has it been going on?"
                   />
                 </label>
                 <label>
@@ -2894,6 +3706,7 @@ function PatientDetailsPage() {
                 <input
                   value={patient.medicalHistory.comorbidities}
                   onChange={(e) => updateSection("medicalHistory", { comorbidities: e.target.value })}
+                  placeholder="List any long-term health issues"
                 />
               </label>
               <TwoColumnFields>
@@ -2902,6 +3715,7 @@ function PatientDetailsPage() {
                   <input
                     value={patient.medicalHistory.currentMedications}
                     onChange={(e) => updateSection("medicalHistory", { currentMedications: e.target.value })}
+                    placeholder="List current medicines"
                   />
                 </label>
                 <label>
@@ -2909,7 +3723,7 @@ function PatientDetailsPage() {
                   <input
                     value={patient.medicalHistory.allergies}
                     onChange={(e) => updateSection("medicalHistory", { allergies: e.target.value })}
-                    placeholder="No known allergies"
+                    placeholder="Type any allergies"
                   />
                 </label>
                 <label>
@@ -2917,7 +3731,7 @@ function PatientDetailsPage() {
                   <input
                     value={patient.medicalHistory.familyHistory}
                     onChange={(e) => updateSection("medicalHistory", { familyHistory: e.target.value })}
-                    placeholder="Diabetes, hypertension"
+                    placeholder="Any similar health issues in the family"
                   />
                 </label>
                 <label>
@@ -2925,7 +3739,7 @@ function PatientDetailsPage() {
                   <input
                     value={patient.medicalHistory.socialHistory}
                     onChange={(e) => updateSection("medicalHistory", { socialHistory: e.target.value })}
-                    placeholder="Smoking, alcohol, activity"
+                    placeholder="Smoking, alcohol, work, or exercise"
                   />
                 </label>
               </TwoColumnFields>
@@ -2949,7 +3763,7 @@ function PatientDetailsPage() {
                   type="number"
                   value={patient.measurements.heartRate}
                   onChange={(e) => updateSection("measurements", { heartRate: e.target.value })}
-                  placeholder="84"
+                  placeholder="Type the pulse"
                 />
               </label>
               <label>
@@ -2958,7 +3772,7 @@ function PatientDetailsPage() {
                   type="number"
                   value={patient.measurements.systolicBp}
                   onChange={(e) => updateSection("measurements", { systolicBp: e.target.value })}
-                  placeholder="136"
+                  placeholder="Top blood pressure number"
                 />
               </label>
               <label>
@@ -2967,7 +3781,7 @@ function PatientDetailsPage() {
                   type="number"
                   value={patient.measurements.diastolicBp}
                   onChange={(e) => updateSection("measurements", { diastolicBp: e.target.value })}
-                  placeholder="88"
+                  placeholder="Bottom blood pressure number"
                 />
               </label>
               <label>
@@ -2976,17 +3790,17 @@ function PatientDetailsPage() {
                   type="number"
                   value={patient.measurements.spo2}
                   onChange={(e) => updateSection("measurements", { spo2: e.target.value })}
-                  placeholder="94"
+                  placeholder="Type oxygen level"
                 />
               </label>
               <label>
-                <span>Temperature</span>
+                <span>Body temperature</span>
                 <input
                   type="number"
                   step="0.1"
                   value={patient.measurements.temperature}
                   onChange={(e) => updateSection("measurements", { temperature: e.target.value })}
-                  placeholder="37.4"
+                  placeholder="Body temperature"
                 />
               </label>
               <label>
@@ -2995,7 +3809,7 @@ function PatientDetailsPage() {
                   type="number"
                   value={patient.measurements.respiratoryRate}
                   onChange={(e) => updateSection("measurements", { respiratoryRate: e.target.value })}
-                  placeholder="16"
+                  placeholder="Breaths per minute"
                 />
               </label>
               <label>
@@ -3005,7 +3819,7 @@ function PatientDetailsPage() {
                   step="0.1"
                   value={patient.measurements.weight}
                   onChange={(e) => updateSection("measurements", { weight: e.target.value })}
-                  placeholder="64.2"
+                  placeholder="Type weight in kg"
                 />
               </label>
               <label>
@@ -3015,7 +3829,7 @@ function PatientDetailsPage() {
                   step="0.1"
                   value={patient.measurements.height}
                   onChange={(e) => updateSection("measurements", { height: e.target.value })}
-                  placeholder="168"
+                  placeholder="Type height in cm"
                 />
               </label>
             </TwoColumnFields>
@@ -3027,8 +3841,8 @@ function PatientDetailsPage() {
           <section className={`intake-summary-card${intakeReady ? " is-ready" : ""}`}>
             <div className="viz-card__head">
               <div>
-                <strong>Intake readiness</strong>
-                <p>Once the required fields are captured, the workflow unlocks the next step automatically.</p>
+                <strong>Form readiness</strong>
+                <p>Complete the required fields to unlock the next step.</p>
               </div>
               <span className={`status-pill${intakeReady ? "" : " status-pill--locked"}`}>
                 {intakeReady ? "Ready to continue" : `${missingRequiredFields.length} missing`}
@@ -3061,22 +3875,9 @@ function PatientDetailsPage() {
               ))}
             </div>
           </section>
-          <div className="callout">
-            <strong>Page 1 structure</strong>
-            <p>
-              Profile, clinical visit, medical history, and measurements stay in one place so we can carry the same
-              patient record into the later pages.
-            </p>
-          </div>
-          <ul className="bullet-list">
-            <li>Profile: identity and encounter anchor</li>
-            <li>Clinical visit: complaint and timing</li>
-            <li>Med history: chronic conditions and therapy</li>
-            <li>Measurements: vitals plus BMI</li>
-          </ul>
         </div>
       }
-      footer="This page is now a proper intake form and should be the first stop for every patient record."
+      footer="This is the first stop for each patient record."
     />
   );
 }
@@ -3210,7 +4011,7 @@ function LabInvestigationPage() {
           <SectionCard
             eyebrow="Report upload"
             title="Upload PDF or CSV report"
-            description="Parse a lab report and auto-fill the matching fields before you review the numbers."
+            description="Upload a lab report to auto-fill the matching fields."
           >
             <div className="upload-zone">
               <label className="upload-button">
@@ -3254,10 +4055,10 @@ function LabInvestigationPage() {
       }
       right={
         <div className="stack">
-          <div className="callout callout--soft">
-            <strong>Validation and hints</strong>
-            <p>Required fields are guarded before Next. Range hints turn green when values sit in the expected clinical band and amber when they fall outside it.</p>
-          </div>
+            <div className="callout callout--soft">
+              <strong>Validation and hints</strong>
+            <p>Required fields are checked before Next. Range hints turn green when values are in range and amber when they are not.</p>
+            </div>
           <div className="measurement-summary">
             <NumberSummary label="Required left" value={missingFields} suffix=" fields" />
             <NumberSummary label="Form status" value={isValid ? "Ready" : "Incomplete"} suffix="" />
@@ -3265,7 +4066,7 @@ function LabInvestigationPage() {
           </div>
           <div className="callout">
             <strong>What happens next</strong>
-            <p>Once the form passes validation, Page 3 can consume the normalized lab state without any extra re-entry.</p>
+            <p>Once the form passes validation, the next step can use the normalized lab state without re-entry.</p>
           </div>
         </div>
       }
@@ -3275,40 +4076,32 @@ function LabInvestigationPage() {
 }
 
 function PatientCareInsightsPage() {
-  const { patient, updateSection } = usePatient();
+  const { patient } = usePatient();
   const step = flowSteps[2];
+  const careInsights = React.useMemo(() => buildPatientCareInsights(patient), [patient]);
 
   return (
-    <StepSkeleton
-      step={step}
-      left={
-        <div className="stack">
-          <label>
-            <span>Clinician summary</span>
-            <textarea
-              rows="6"
-              value={patient.careInsights.clinicianSummary}
-              onChange={(e) => updateSection("careInsights", { clinicianSummary: e.target.value })}
-            />
-          </label>
+    <StepLayout step={step}>
+      <div className="care-insights-dashboard care-insights-dashboard--compact">
+        <div className="care-insights-card-grid">
+          <AnomalyGaugeCard score={careInsights.totalSeverity} riskLevel={careInsights.riskLevel} totalCount={careInsights.anomalies.length} />
+          <GraphPanel
+            title="Anomaly level by area"
+            subtitle="Higher bars mean more attention is needed in that area."
+            items={careInsights.domainScores}
+            valueKey="value"
+            valueLabel="Severity"
+          />
+          <RadarChart metrics={careInsights.radarMetrics} />
+          <AnomalyTrendChart series={careInsights.trendSeries} score={careInsights.totalSeverity} riskLevel={careInsights.riskLevel} />
+          <HeatmapGrid cells={careInsights.heatmapCells} />
+          <AnomalyPositionChart anomalies={careInsights.anomalies} />
+          <AnomalyBubbleCard anomalies={careInsights.anomalies} />
+          <AnomalyRankCard anomalies={careInsights.anomalies} />
         </div>
-      }
-      right={
-        <div className="stack">
-          <div className="callout">
-            <strong>Insight surface</strong>
-            <p>This page will later convert the intake and lab record into a care narrative for clinicians.</p>
-          </div>
-          <ul className="bullet-list">
-            <li>Observed risk signals</li>
-            <li>Suggested follow-up urgency</li>
-            <li>Care coordination needs</li>
-            <li>Escalation checklist</li>
-          </ul>
-        </div>
-      }
-      footer="The context collected here should stay human-readable so clinicians can review it without leaving the page."
-    />
+
+      </div>
+    </StepLayout>
   );
 }
 
@@ -3318,10 +4111,6 @@ function ComparativeAnalysisPage() {
   const [isRunning, setIsRunning] = React.useState(false);
   const runTimerRef = React.useRef(null);
   const analysisReady = modelResults.status === "complete";
-  const analysisDatasetQuery = useQuery({
-    queryKey: ["analysis-dataset"],
-    queryFn: fetchAnalysisDataset,
-  });
 
   React.useEffect(() => () => {
     if (runTimerRef.current) {
@@ -3401,11 +4190,11 @@ function ComparativeAnalysisPage() {
   }, [comparisonRows]);
 
   const summaryPoints = analysisReady ? modelResults.summaryPoints || [] : [];
-  const loadingLabel = analysisDatasetQuery.isLoading
-    ? "Loading dashboard data..."
-    : analysisDatasetQuery.isError
-      ? "Using computed analysis data"
-      : "Dashboard data ready";
+  const loadingLabel = "Waiting for user input";
+  const scoreSpreadLabel = `${Math.round((comparisonInsights.scoreSpread || 0) * 100)}%`;
+  const selectedModelName = comparisonInsights.bestTradeoff?.name || "Locked";
+  const fastestModelName = comparisonInsights.fastest?.name || "Locked";
+  const lightestModelName = comparisonInsights.lightest?.name || "Locked";
 
   return (
     <StepSkeleton
@@ -3420,7 +4209,7 @@ function ComparativeAnalysisPage() {
                 <p className="eyebrow">Run / Reset</p>
                 <h3>Comparative analysis</h3>
                 <p className="section-card__description">
-                  Compare detector behavior, review the best tradeoff, and inspect how the leading models diverge.
+                  Compare detector behavior, the best tradeoff, and how the leading models diverge.
                 </p>
               </div>
               <div className={`analysis-status-chip analysis-status-chip--${modelResults.status}`}>
@@ -3428,7 +4217,7 @@ function ComparativeAnalysisPage() {
               </div>
             </div>
             <div className="analysis-fetch-chip">
-              <span>React Query + Axios</span>
+              <span>User input only</span>
               <strong>{loadingLabel}</strong>
             </div>
             <div className="analysis-control__buttons">
@@ -3463,13 +4252,13 @@ function ComparativeAnalysisPage() {
             unlocked={true}
             eyebrow="Score histogram"
             title="Anomaly score distribution"
-            description="The first visit shows a single bar. After you run the analysis, the chart grows with each saved run."
+            description="The first run shows one bar, then each saved run adds to the chart."
           >
             {analysisReady ? (
               <ScoreHistogramCard
                 history={modelResults.history || []}
                 currentScore={modelResults.overallScore ?? 0}
-                loading={analysisDatasetQuery.isLoading}
+                loading={false}
               />
             ) : (
               <HistogramSeedCard currentScore={modelResults.overallScore ?? 0} />
@@ -3480,89 +4269,154 @@ function ComparativeAnalysisPage() {
             unlocked={true}
             eyebrow="Timeline"
             title="Anomaly score timeline"
-            description="The timeline starts with a single seeded point and expands as new runs are recorded."
+            description="The timeline starts with one seeded point and grows with each run."
           >
             <AnomalyTimelineCard
               series={modelResults.trendSeries || []}
               currentScore={modelResults.overallScore ?? 0}
-              loading={analysisDatasetQuery.isLoading}
+              loading={false}
             />
           </AnalysisSection>
 
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Comparison matrix"
-            title="Model performance side by side"
-            description="This view compares score, precision, recall, and accuracy so the strongest detector is visible at a glance."
-            lockMessage="Run the anomaly test to unlock the comparison matrix."
-          >
-            <div className="section-stack">
-              <ModelComparisonChart models={comparisonRows} />
-              <ModelComparisonTable models={comparisonRows} />
-            </div>
-          </AnalysisSection>
+          <div className="analysis-pair-grid">
+            <AnalysisSection
+              unlocked={analysisReady}
+              eyebrow="Comparison matrix"
+              title="Model performance side by side"
+              description="This view compares score, precision, recall, and accuracy, with the strongest detector first and the score spread called out."
+              lockMessage="Run the anomaly test to unlock the comparison matrix."
+            >
+              <div className="section-stack comparison-section-stack">
+                <div className="comparison-storyboard">
+                  <div className="comparison-storyboard__item">
+                    <span>Leading model</span>
+                    <strong>{comparisonInsights.leader?.name || "Locked"}</strong>
+                  </div>
+                  <div className="comparison-storyboard__item">
+                    <span>Score spread</span>
+                    <strong>{scoreSpreadLabel}</strong>
+                  </div>
+                  <div className="comparison-storyboard__item">
+                    <span>Best tradeoff</span>
+                    <strong>{selectedModelName}</strong>
+                  </div>
+                  <div className="comparison-storyboard__item">
+                    <span>Top tier count</span>
+                    <strong>{comparisonRows.filter((model) => model.score >= 0.85).length}</strong>
+                  </div>
+                </div>
+                <ModelComparisonChart models={comparisonRows} />
+                <ModelComparisonTable models={comparisonRows} />
+              </div>
+            </AnalysisSection>
 
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Operational cost"
-            title="Latency and memory tradeoffs"
-            description="Comparative analysis should show not only model quality, but also runtime cost."
-            lockMessage="Run the anomaly test to unlock the operational comparison."
-          >
-            <div className="comparison-grid">
-              <GraphPanel
-                title="Latency comparison"
-                subtitle="Lower latency is better for rural deployment and quick triage."
-                items={comparisonRows}
-                valueKey="latencyMs"
-                valueLabel="ms"
-                reverse
-              />
-              <GraphPanel
-                title="Memory comparison"
-                subtitle="Lower memory footprint is easier on constrained devices."
-                items={comparisonRows}
-                valueKey="memoryMb"
-                valueLabel="MB"
-                reverse
-              />
-            </div>
-          </AnalysisSection>
+            <AnalysisSection
+              unlocked={analysisReady}
+              eyebrow="Operational cost"
+              title="Latency and memory tradeoffs"
+              description="Shows runtime cost alongside model quality so the deployment choice is easier."
+              lockMessage="Run the anomaly test to unlock the operational comparison."
+            >
+              <div className="section-stack comparison-cost-stack">
+                <div className="comparison-storyboard comparison-storyboard--cost">
+                  <div className="comparison-storyboard__item">
+                    <span>Fastest</span>
+                    <strong>{fastestModelName}</strong>
+                  </div>
+                  <div className="comparison-storyboard__item">
+                    <span>Lightest</span>
+                    <strong>{lightestModelName}</strong>
+                  </div>
+                  <div className="comparison-storyboard__item">
+                    <span>Best tradeoff</span>
+                    <strong>{selectedModelName}</strong>
+                  </div>
+                  <div className="comparison-storyboard__item">
+                    <span>Latency focus</span>
+                    <strong>Lower is better</strong>
+                  </div>
+                </div>
+                <div className="comparison-grid">
+                  <GraphPanel
+                    title="Latency comparison"
+                    subtitle="Lower latency is better for rural deployment and quick triage."
+                    items={comparisonRows}
+                    valueKey="latencyMs"
+                    valueLabel="ms"
+                    reverse
+                  />
+                  <GraphPanel
+                    title="Memory comparison"
+                    subtitle="Lower memory footprint is easier on constrained devices."
+                    items={comparisonRows}
+                    valueKey="memoryMb"
+                    valueLabel="MB"
+                    reverse
+                  />
+                </div>
+                <div className="comparison-matrix-note">
+                  <strong>Deployment read:</strong>
+                  <span>The fastest detector is not always the best one to keep online. The best tradeoff balances score with the smallest runtime burden.</span>
+                </div>
+              </div>
+            </AnalysisSection>
+          </div>
 
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Before / after"
-            title="Change from the previous run"
-            description="This comparison shows whether the latest patient context is improving or worsening the anomaly score."
-            lockMessage="Run the anomaly test to unlock the before and after view."
-          >
-            <ProgressComparisonCard beforeAfter={modelResults.beforeAfter} progression={modelResults.progression} />
-          </AnalysisSection>
+          <div className="analysis-pair-grid">
+            <AnalysisSection
+              unlocked={analysisReady}
+              eyebrow="Before / after"
+              title="Change from the previous run"
+              description="Shows whether the latest run improved or worsened the score, and by how much."
+              lockMessage="Run the anomaly test to unlock the before and after view."
+            >
+              <ProgressComparisonCard beforeAfter={modelResults.beforeAfter} progression={modelResults.progression} />
+            </AnalysisSection>
 
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Narrative"
-            title="What the comparison means"
-            description="A short readout turns the raw metrics into an interpretation for clinicians."
-            lockMessage="Run the anomaly test to unlock the summary narrative."
-          >
-            <div className="callout callout--soft">
-              <strong>Comparative takeaway</strong>
-              <p>
-                {analysisReady
-                  ? `The ${comparisonInsights.bestTradeoff?.name || "selected model"} offers the best balance of predictive quality and operational cost, while ${comparisonInsights.fastest?.name || "the fastest detector"} is the quickest to serve.`
-                  : "Run the anomaly test to see the tradeoff summary."}
-              </p>
-            </div>
-            <ul className="bullet-list">
-              {summaryPoints.length
-                ? summaryPoints.map((point) => <li key={point}>{point}</li>)
-                : [
-                    "Leader, tradeoff, and spread metrics stay locked until the analysis is complete.",
-                    "Operational cost is included alongside model quality so deployment constraints stay visible.",
-                  ].map((point) => <li key={point}>{point}</li>)}
-            </ul>
-          </AnalysisSection>
+            <AnalysisSection
+              unlocked={analysisReady}
+              eyebrow="Narrative"
+              title="What the comparison means"
+              description="Turns the raw metrics into a short clinician-friendly interpretation."
+              lockMessage="Run the anomaly test to unlock the summary narrative."
+            >
+              <div className="comparison-narrative">
+                <div className="comparison-narrative__summary">
+                  <div className="comparison-narrative__card">
+                    <span>Best balance</span>
+                    <strong>{selectedModelName}</strong>
+                    <p>{analysisReady ? "Highest overall balance of predictive quality and operational cost." : "Run the anomaly test to reveal the best balance."}</p>
+                  </div>
+                  <div className="comparison-narrative__card">
+                    <span>Quickest to serve</span>
+                    <strong>{fastestModelName}</strong>
+                    <p>{analysisReady ? "Lowest latency for quick deployment and faster responses." : "Run the anomaly test to reveal the fastest detector."}</p>
+                  </div>
+                  <div className="comparison-narrative__card">
+                    <span>Most lightweight</span>
+                    <strong>{lightestModelName}</strong>
+                    <p>{analysisReady ? "Smallest memory footprint for constrained hardware." : "Run the anomaly test to reveal the lightest detector."}</p>
+                  </div>
+                </div>
+                <div className="callout callout--soft">
+                  <strong>Comparative takeaway</strong>
+                  <p>
+                    {analysisReady
+                      ? `The ${comparisonInsights.bestTradeoff?.name || "selected model"} offers the best balance of predictive quality and operational cost, while ${comparisonInsights.fastest?.name || "the fastest detector"} is the quickest to serve.`
+                      : "Run the anomaly test to see the tradeoff summary."}
+                  </p>
+                </div>
+                <ul className="bullet-list">
+                  {summaryPoints.length
+                    ? summaryPoints.map((point) => <li key={point}>{point}</li>)
+                    : [
+                        "Leader, tradeoff, and spread metrics stay locked until the analysis is complete.",
+                        "Operational cost is included alongside model quality so deployment constraints stay visible.",
+                      ].map((point) => <li key={point}>{point}</li>)}
+                </ul>
+              </div>
+            </AnalysisSection>
+          </div>
         </div>
       }
       right={
@@ -3571,7 +4425,7 @@ function ComparativeAnalysisPage() {
             unlocked={analysisReady}
             eyebrow="Risk map"
             title="Comparative model risk map"
-            description="Model scores are placed into Low, Medium, and High bands to show the spread at a glance."
+            description="Model scores are grouped into Low, Medium, and High bands."
             lockMessage="Run the anomaly test to unlock the risk map."
           >
             <ComparisonRiskMap models={comparisonRows} />
@@ -3581,20 +4435,20 @@ function ComparativeAnalysisPage() {
             unlocked={analysisReady}
             eyebrow="Radar"
             title="Clinical deviation radar"
-            description="The underlying patient signals explain why the comparative score moved."
+            description="The patient signals explain why the score moved."
             lockMessage="Run the anomaly test to unlock the radar view."
           >
-            <RechartsRadarCard metrics={modelResults.radarMetrics} loading={analysisDatasetQuery.isLoading} />
+            <RechartsRadarCard metrics={modelResults.radarMetrics} loading={false} />
           </AnalysisSection>
 
           <AnalysisSection
             unlocked={analysisReady}
             eyebrow="Feature drivers"
             title="Top comparative drivers"
-            description="The strongest features help explain the current run."
+            description="The strongest features explain the current run."
             lockMessage="Run the anomaly test to unlock the feature contributions."
           >
-            <RechartsShapCard features={modelResults.shapSummary} loading={analysisDatasetQuery.isLoading} />
+            <RechartsShapCard features={modelResults.shapSummary} loading={false} />
           </AnalysisSection>
 
           <AnalysisSection
@@ -3625,7 +4479,6 @@ function ComparativeAnalysisPage() {
           </AnalysisSection>
         </div>
       }
-      footer="This comparative page now emphasizes model ranking, operational tradeoffs, and a clear narrative for decision support."
     />
   );
 }
@@ -3657,9 +4510,26 @@ function DecisionSupportPage() {
     return consensusModels[0].score - consensusModels[consensusModels.length - 1].score;
   }, [consensusModels]);
   const riskAction = getRiskAction(analysisReady ? modelResults.riskLevel : "Low");
-  const immediateRecommendations = getImmediateRecommendations(analysisReady ? modelResults.riskLevel : "Low");
-  const followUpPlan = getFollowUpPlan(analysisReady ? modelResults.riskLevel : "Low");
-  const references = getReferences();
+  const decisionGuidance = React.useMemo(
+    () =>
+      analysisReady
+        ? buildDecisionSupportGuidance({
+            riskLevel: modelResults.riskLevel,
+            topSignals,
+            comparisonRows,
+            consensusScore,
+            consensusSpread,
+          })
+        : {
+            immediateRecommendations: [],
+            followUpPlan: [],
+            references: [],
+          },
+    [analysisReady, comparisonRows, consensusScore, consensusSpread, modelResults.riskLevel, topSignals],
+  );
+  const immediateRecommendations = decisionGuidance.immediateRecommendations;
+  const followUpPlan = decisionGuidance.followUpPlan;
+  const references = decisionGuidance.references;
   const screeningLabel = analysisReady ? `${modelResults.riskLevel} risk` : "Awaiting analysis";
   const screeningTone = analysisReady ? modelResults.riskLevel.toLowerCase() : "locked";
   const scoreLabel = analysisReady ? modelResults.overallScore.toFixed(2) : "0.00";
@@ -3742,7 +4612,7 @@ function DecisionSupportPage() {
     <StepSkeleton
       step={step}
       nextDisabled={!analysisReady}
-      nextLabel="Continue to Backend Processing"
+      nextLabel="Continue to Model Analytical Hub"
       left={
         <div className="section-stack">
           <section className={`result-card result-card--${screeningTone}`}>
@@ -3860,7 +4730,7 @@ function DecisionSupportPage() {
                   rows="4"
                   value={feedbackForm.note}
                   onChange={(e) => handleFeedbackChange("note", e.target.value)}
-                  placeholder="Capture bedside context, missing data, or why you agree or disagree."
+                  placeholder="Add a short note about what you think."
                   disabled={!analysisReady}
                 />
               </label>
@@ -3877,7 +4747,7 @@ function DecisionSupportPage() {
             unlocked={analysisReady}
             eyebrow="Consensus"
             title="Model consensus display"
-            description="See how closely the leading detectors agree on the current decision."
+            description="See how closely the leading detectors agree."
             lockMessage="Run the anomaly test to unlock the consensus display."
           >
             <DecisionConsensusCard models={comparisonRows} />
@@ -3887,7 +4757,7 @@ function DecisionSupportPage() {
             unlocked={analysisReady}
             eyebrow="Risk map"
             title="Consensus risk map"
-            description="The risk map plots score against latency so you can see both accuracy and operational cost."
+            description="The risk map plots score against latency."
             lockMessage="Run the anomaly test to unlock the risk map."
           >
             <DecisionRiskMap models={comparisonRows} />
@@ -3897,9 +4767,9 @@ function DecisionSupportPage() {
             <p className="eyebrow">Immediate recommendations</p>
             <h3>What to do now</h3>
             <ul className="bullet-list">
-              {immediateRecommendations.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
+              {analysisReady
+                ? immediateRecommendations.map((item) => <li key={item}>{item}</li>)
+                : ["Run the anomaly test to generate recommendations."].map((item) => <li key={item}>{item}</li>)}
             </ul>
           </section>
 
@@ -3907,9 +4777,9 @@ function DecisionSupportPage() {
             <p className="eyebrow">Follow-up plan</p>
             <h3>Next-touch plan</h3>
             <ul className="bullet-list">
-              {followUpPlan.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
+              {analysisReady
+                ? followUpPlan.map((item) => <li key={item}>{item}</li>)
+                : ["Run the anomaly test to generate a follow-up plan."].map((item) => <li key={item}>{item}</li>)}
             </ul>
           </section>
 
@@ -3917,14 +4787,14 @@ function DecisionSupportPage() {
             <p className="eyebrow">References</p>
             <h3>Source guidance</h3>
             <ul className="bullet-list">
-              {references.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
+              {analysisReady
+                ? references.map((item) => <li key={item}>{item}</li>)
+                : ["Run the anomaly test to generate source guidance."].map((item) => <li key={item}>{item}</li>)}
             </ul>
           </section>
         </div>
       }
-      footer="This page turns the analysis into decision support, consensus review, clinician feedback, and action before the backend processing stage."
+      footer="This page turns the analysis into decision support, consensus review, clinician feedback, and action."
     />
   );
 }
@@ -4130,7 +5000,7 @@ function BackendProcessingPage() {
           </section>
         </div>
       }
-      footer="This route now performs feature engineering, validation, and bundle preparation before the model hub consumes the output."
+      footer="This route now performs feature engineering, validation, and bundle preparation before the model analytical hub consumes the output."
     />
   );
 }
@@ -4304,13 +5174,13 @@ const router = createBrowserRouter([
       {
         element: <StepGuard />,
         children: [
-          { path: "patient-details", element: <PatientDetailsPage /> },
-          { path: "lab-investigation", element: <LabInvestigationPage /> },
-          { path: "patient-care-insights", element: <PatientCareInsightsPage /> },
-          { path: "comparative-analysis", element: <ComparativeAnalysisPage /> },
-          { path: "decision-support", element: <DecisionSupportPage /> },
-          { path: "backend-processing", element: <BackendProcessingPage /> },
-          { path: "model-analytical-hub", element: <ModelAnalyticalHubPage /> },
+        { path: "patient-details", element: <PatientDetailsPage /> },
+        { path: "lab-investigation", element: <LabInvestigationPage /> },
+        { path: "patient-care-insights", element: <PatientCareInsightsPage /> },
+        { path: "comparative-analysis", element: <ComparativeAnalysisPage /> },
+        { path: "decision-support", element: <DecisionSupportPage /> },
+        { path: "backend-processing", element: <Navigate to="/model-analytical-hub" replace /> },
+        { path: "model-analytical-hub", element: <ModelAnalyticalHubPage /> },
         ],
       },
     ],
@@ -4319,8 +5189,6 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <RouterProvider router={router} />
   </React.StrictMode>,
 );

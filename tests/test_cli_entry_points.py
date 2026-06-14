@@ -1507,7 +1507,7 @@ class CliEntryPointTests(unittest.TestCase):
             action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
         )
 
-        self.assertEqual(set(subparsers_action.choices), {"train", "predict", "export-edge", "retrain-feedback", "evaluate"})
+        self.assertEqual(set(subparsers_action.choices), {"train", "split-data", "predict", "export-edge", "retrain-feedback", "evaluate"})
         self.assertIn("anomaly-cli train", readme_text)
         self.assertIn("anomaly-cli predict", readme_text)
         self.assertIn("anomaly-cli evaluate", readme_text)
@@ -1554,6 +1554,7 @@ class CliEntryPointTests(unittest.TestCase):
                 "--synthetic-demo-rows",
                 "--synthetic-demo-seed",
             },
+            "split-data": {"--input", "--output-dir", "--train-fraction", "--validation-fraction", "--test-fraction", "--group-column", "--random-state"},
             "predict": {"--model", "--input", "--output"},
             "export-edge": {"--model", "--output-dir", "--opset"},
             "retrain-feedback": {"--input", "--feedback-file", "--output", "--config-json"},

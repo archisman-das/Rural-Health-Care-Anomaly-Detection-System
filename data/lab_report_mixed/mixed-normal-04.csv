@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-N-004,anomaly_free,Routine Panel - Normal,Another clean report for normal upload testing.,97,134,5.4,13.8,7.2,251,96,47,139,27,23,0.8,4.2,0.9,17,93,138,4.5,101,23

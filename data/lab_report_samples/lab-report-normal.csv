@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+NORMAL-001,anomaly_free,Routine Panel - Normal,All values are within typical ranges.,92,126,5.3,14.2,6.8,240,88,53,124,26,22,0.7,4.3,0.9,15,98,140,4.3,103,24

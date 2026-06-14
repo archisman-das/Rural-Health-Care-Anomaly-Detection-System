@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-401,anomaly,Combined Multi-System Abnormality,"Mixed glucose, CBC, liver, kidney, and electrolyte abnormalities.",158,236,8.3,10.2,11.9,165,145,34,214,63,71,1.8,3.2,1.7,34,57,132,5.3,95,20

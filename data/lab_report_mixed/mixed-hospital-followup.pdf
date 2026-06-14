@@ -1,0 +1,85 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 4 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 651 >>
+stream
+BT
+/F1 11 Tf
+13 TL
+72 760 Td
+(Hospital Follow-up Abnormality) Tj
+T*
+(Sample ID: MIX-A-411) Tj
+T*
+(Status: anomaly) Tj
+T*
+(Description: Post-discharge panel with lingering multiple abnormalities.) Tj
+T*
+() Tj
+T*
+(Fasting glucose: 145) Tj
+T*
+(Postprandial glucose: 216) Tj
+T*
+(HbA1c: 7.7) Tj
+T*
+(Hemoglobin: 11.5) Tj
+T*
+(WBC count: 10.9) Tj
+T*
+(Platelet count: 182) Tj
+T*
+(LDL: 132) Tj
+T*
+(HDL: 39) Tj
+T*
+(Triglycerides: 190) Tj
+T*
+(AST: 58) Tj
+T*
+(ALT: 64) Tj
+T*
+(Bilirubin: 1.4) Tj
+T*
+(Albumin: 3.4) Tj
+T*
+(Creatinine: 1.3) Tj
+T*
+(Urea: 26) Tj
+T*
+(eGFR: 78) Tj
+T*
+(Sodium: 134) Tj
+T*
+(Potassium: 5.0) Tj
+T*
+(Chloride: 98) Tj
+T*
+(Bicarbonate: 22) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1013
+%%EOF

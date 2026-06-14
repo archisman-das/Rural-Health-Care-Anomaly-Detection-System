@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-404,anomaly,Dehydration and Salt Stress,Renal markers and sodium shift suggest fluid imbalance.,94,125,5.3,14.7,7.1,242,90,52,127,24,22,0.7,4.4,1.4,29,68,148,5.2,111,20

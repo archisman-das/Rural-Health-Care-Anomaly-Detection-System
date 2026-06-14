@@ -102,6 +102,7 @@ def evaluate_labeled_scores(
         "precision": _safe_metric(lambda y, p: precision_score(y, p, zero_division=0), y_true_binary, y_pred_binary),
         "recall": _safe_metric(lambda y, p: recall_score(y, p, zero_division=0), y_true_binary, y_pred_binary),
         "f1": _safe_metric(lambda y, p: f1_score(y, p, zero_division=0), y_true_binary, y_pred_binary),
+        "accuracy": _safe_metric(lambda y, p: float(np.mean(np.asarray(y) == np.asarray(p))), y_true_binary, y_pred_binary),
         "roc_auc": float("nan"),
         "auprc": float("nan"),
     }

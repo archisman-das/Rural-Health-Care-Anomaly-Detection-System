@@ -18,7 +18,10 @@ from .training import (
     load_tabular_data,
     save_pipeline,
     score_records,
+    split_tabular_dataset,
+    save_dataset_splits,
     train_anomaly_pipeline,
+    train_anomaly_pipeline_from_split,
 )
 
 _CONFIG_HELP = (
@@ -703,6 +706,48 @@ def _add_training_data_source_arguments(parser: argparse.ArgumentParser) -> None
         default=42,
         help="Random seed used for synthetic demo data generation.",
     )
+    parser.add_argument(
+        "--split-dir",
+        default=None,
+        help="Optional directory containing train, validation, and test subfolders with CSV or Parquet data.",
+    )
+
+
+def _add_split_dataset_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--output-dir",
+        required=True,
+        help="Directory where train, validation, and test folders will be written.",
+    )
+    parser.add_argument(
+        "--train-fraction",
+        type=float,
+        default=0.7,
+        help="Fraction of rows assigned to the train split.",
+    )
+    parser.add_argument(
+        "--validation-fraction",
+        type=float,
+        default=0.15,
+        help="Fraction of rows assigned to the validation split.",
+    )
+    parser.add_argument(
+        "--test-fraction",
+        type=float,
+        default=0.15,
+        help="Fraction of rows assigned to the test split.",
+    )
+    parser.add_argument(
+        "--group-column",
+        default="patient_id",
+        help="Column used to keep related rows in the same split when available.",
+    )
+    parser.add_argument(
+        "--random-state",
+        type=int,
+        default=42,
+        help="Random seed used when shuffling rows or groups for the split.",
+    )
 
 
 def _add_threshold_calibration_argument(parser: argparse.ArgumentParser) -> None:
@@ -883,6 +928,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_deep_svdd_arguments(train_parser)
     _add_ensemble_fusion_arguments(train_parser)
 
+    split_parser = subparsers.add_parser(
+        "split-data",
+        help="Split a raw dataset into train, validation, and test folders.",
+    )
+    split_parser.add_argument("--input", required=True, help="Path to the raw CSV or Parquet dataset.")
+    _add_split_dataset_arguments(split_parser)
+
     predict_parser = subparsers.add_parser("predict", help="Run inference from a saved model.")
     predict_parser.add_argument("--model", required=True, help="Path to a saved pipeline (.joblib).")
     predict_parser.add_argument("--input", required=True, help="Path to inference data (.csv or .parquet).")
@@ -997,31 +1049,44 @@ def run_train(args: argparse.Namespace) -> None:
             target_rows=int(getattr(args, "synthetic_demo_rows", 9600)),
             seed=int(getattr(args, "synthetic_demo_seed", 42)),
         )
+        pipeline = train_anomaly_pipeline(data, config=config)
     else:
-        if not getattr(args, "input", None):
-            raise ValueError("Training input is required unless --synthetic-demo-data is set.")
-        data = load_tabular_data(args.input)
-    labels = None
-    if getattr(args, "labels_file", None):
-        labels_frame = load_tabular_data(args.labels_file)
-        if args.labels_column:
-            if args.labels_column not in labels_frame.columns:
-                raise ValueError(
-                    f"Labels column '{args.labels_column}' was not found in the labels file."
-                )
-            labels = labels_frame[args.labels_column]
-        elif labels_frame.shape[1] == 1:
-            labels = labels_frame.iloc[:, 0]
-        else:
-            raise ValueError(
-                "labels-file contains more than one column; pass --labels-column to choose the label field."
+        if getattr(args, "split_dir", None):
+            split_path = Path(args.split_dir)
+            if not split_path.exists():
+                raise FileNotFoundError(f"Split directory not found: {split_path}")
+            pipeline, split_metrics = train_anomaly_pipeline_from_split(
+                split_path,
+                label_column=getattr(args, "label_column", None),
+                config=config,
             )
-    if getattr(args, "label_column", None):
-        if args.label_column not in data.columns:
-            raise ValueError(f"Label column '{args.label_column}' was not found in the training data.")
-        labels = data[args.label_column]
-        data = data.drop(columns=[args.label_column])
-    pipeline = train_anomaly_pipeline(data, y=labels, config=config)
+            if split_metrics:
+                print(json.dumps(split_metrics, indent=2))
+        else:
+            if not getattr(args, "input", None):
+                raise ValueError("Training input is required unless --synthetic-demo-data or --split-dir is set.")
+            data = load_tabular_data(args.input)
+            labels = None
+            if getattr(args, "labels_file", None):
+                labels_frame = load_tabular_data(args.labels_file)
+                if args.labels_column:
+                    if args.labels_column not in labels_frame.columns:
+                        raise ValueError(
+                            f"Labels column '{args.labels_column}' was not found in the labels file."
+                        )
+                    labels = labels_frame[args.labels_column]
+                elif labels_frame.shape[1] == 1:
+                    labels = labels_frame.iloc[:, 0]
+                else:
+                    raise ValueError(
+                        "labels-file contains more than one column; pass --labels-column to choose the label field."
+                    )
+            if getattr(args, "label_column", None):
+                if args.label_column not in data.columns:
+                    raise ValueError(f"Label column '{args.label_column}' was not found in the training data.")
+                labels = data[args.label_column]
+                data = data.drop(columns=[args.label_column])
+            pipeline = train_anomaly_pipeline(data, y=labels, config=config)
     save_pipeline(pipeline, args.output)
 
     if args.feature_map:
@@ -1031,6 +1096,19 @@ def run_train(args: argparse.Namespace) -> None:
     print(f"Trained pipeline saved to {args.output}")
     if args.feature_map:
         print(f"Feature map saved to {args.feature_map}")
+
+
+def run_split_data(args: argparse.Namespace) -> None:
+    splits = split_tabular_dataset(
+        load_tabular_data(args.input),
+        train_fraction=args.train_fraction,
+        validation_fraction=args.validation_fraction,
+        test_fraction=args.test_fraction,
+        group_column=args.group_column,
+        random_state=args.random_state,
+    )
+    manifest = save_dataset_splits(splits, args.output_dir)
+    print(json.dumps({"output_dir": args.output_dir, "files": manifest}, indent=2))
 
 
 def run_predict(args: argparse.Namespace) -> None:
@@ -1137,6 +1215,10 @@ def main() -> None:
 
     if args.command == "train":
         run_train(args)
+        return
+
+    if args.command == "split-data":
+        run_split_data(args)
         return
 
     if args.command == "predict":

@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-407,anomaly,Mild Kidney Strain,Slightly elevated creatinine and reduced eGFR.,95,130,5.5,13.0,6.9,247,95,48,134,25,24,0.8,4.0,1.5,24,73,137,4.8,100,22

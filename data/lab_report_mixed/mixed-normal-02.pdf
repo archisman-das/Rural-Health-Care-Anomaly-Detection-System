@@ -1,0 +1,85 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 4 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 656 >>
+stream
+BT
+/F1 11 Tf
+13 TL
+72 760 Td
+(Routine Panel - Normal) Tj
+T*
+(Sample ID: MIX-N-002) Tj
+T*
+(Status: anomaly_free) Tj
+T*
+(Description: Another normal case with slightly different but still healthy values.) Tj
+T*
+() Tj
+T*
+(Fasting glucose: 96) Tj
+T*
+(Postprandial glucose: 131) Tj
+T*
+(HbA1c: 5.5) Tj
+T*
+(Hemoglobin: 13.6) Tj
+T*
+(WBC count: 7.0) Tj
+T*
+(Platelet count: 248) Tj
+T*
+(LDL: 92) Tj
+T*
+(HDL: 49) Tj
+T*
+(Triglycerides: 136) Tj
+T*
+(AST: 28) Tj
+T*
+(ALT: 25) Tj
+T*
+(Bilirubin: 0.8) Tj
+T*
+(Albumin: 4.1) Tj
+T*
+(Creatinine: 0.9) Tj
+T*
+(Urea: 16) Tj
+T*
+(eGFR: 96) Tj
+T*
+(Sodium: 139) Tj
+T*
+(Potassium: 4.4) Tj
+T*
+(Chloride: 102) Tj
+T*
+(Bicarbonate: 24) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1018
+%%EOF

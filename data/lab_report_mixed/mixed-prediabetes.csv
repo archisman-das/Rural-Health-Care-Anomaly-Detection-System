@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-101,anomaly,Prediabetes and Sugar Drift,Mildly elevated glucose values with borderline HbA1c.,118,168,6.1,13.9,6.9,242,104,43,164,27,28,0.7,4.2,0.9,15,95,138,4.3,103,24

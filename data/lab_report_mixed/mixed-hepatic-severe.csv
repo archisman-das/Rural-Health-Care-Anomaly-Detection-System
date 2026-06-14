@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-405,anomaly,Severe Liver Stress,Marked liver enzyme elevation and low albumin.,86,119,5.2,12.6,7.0,219,102,44,145,142,176,3.1,2.8,1.0,17,91,136,4.1,102,23

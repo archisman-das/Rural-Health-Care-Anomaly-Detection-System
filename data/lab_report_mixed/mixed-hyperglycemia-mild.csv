@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-406,anomaly,Mild Hyperglycemia,Fasting and post-meal glucose are above normal but not extreme.,109,152,6.0,13.7,6.6,239,101,45,151,26,26,0.7,4.1,0.9,15,97,140,4.3,103,24

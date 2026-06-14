@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+RENAL-307,anomaly,Kidney Function Focus,Creatinine is high and eGFR is reduced.,101,145,5.8,12.9,7.4,248,99,44,144,29,27,0.9,4.0,2.0,40,49,137,5.5,100,21

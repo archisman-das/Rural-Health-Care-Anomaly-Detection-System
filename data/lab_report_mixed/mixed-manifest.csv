@@ -1,0 +1,24 @@
+sampleId,status,reportType,description,fileBase
+MIX-N-001,anomaly_free,Routine Panel - Normal,Healthy baseline values inside the expected ranges.,mixed-normal-01
+MIX-N-002,anomaly_free,Routine Panel - Normal,Another normal case with slightly different but still healthy values.,mixed-normal-02
+MIX-A-101,anomaly,Prediabetes and Sugar Drift,Mildly elevated glucose values with borderline HbA1c.,mixed-prediabetes
+MIX-A-102,anomaly,Diabetes Control Panel,"High fasting glucose, high postprandial glucose, and elevated HbA1c.",mixed-diabetes
+MIX-A-201,anomaly,Anemia and CBC Review,Low hemoglobin with high WBC and platelets.,mixed-anemia
+MIX-A-202,anomaly,Inflammation / Infection Pattern,High WBC count with reactive blood count changes.,mixed-infection
+MIX-A-301,anomaly,Kidney Function Focus,Reduced kidney function with electrolyte stress.,mixed-kidney
+MIX-A-302,anomaly,Liver Panel Review,Raised liver enzymes and bilirubin with low albumin.,mixed-liver
+MIX-A-303,anomaly,Electrolyte Imbalance Panel,"Sodium, potassium, chloride, and bicarbonate are abnormal.",mixed-electrolyte
+MIX-A-401,anomaly,Combined Multi-System Abnormality,"Mixed glucose, CBC, liver, kidney, and electrolyte abnormalities.",mixed-combined
+MIX-N-003,anomaly_free,Routine Panel - Normal,Balanced values with good blood sugar and blood count.,mixed-normal-03
+MIX-N-004,anomaly_free,Routine Panel - Normal,Another clean report for normal upload testing.,mixed-normal-04
+MIX-A-402,anomaly,Borderline CBC Variation,Mild anemia with mild inflammatory rise.,mixed-borderline-cbc
+MIX-A-403,anomaly,Borderline Lipid Shift,LDL and triglycerides are elevated while HDL is low.,mixed-borderline-lipids
+MIX-A-404,anomaly,Dehydration and Salt Stress,Renal markers and sodium shift suggest fluid imbalance.,mixed-dehydration
+MIX-A-405,anomaly,Severe Liver Stress,Marked liver enzyme elevation and low albumin.,mixed-hepatic-severe
+MIX-A-406,anomaly,Mild Hyperglycemia,Fasting and post-meal glucose are above normal but not extreme.,mixed-hyperglycemia-mild
+MIX-A-407,anomaly,Mild Kidney Strain,Slightly elevated creatinine and reduced eGFR.,mixed-renal-mild
+MIX-A-408,anomaly,Mild Electrolyte Shift,Small electrolyte movement with mild bicarbonate reduction.,mixed-electrolyte-mild
+MIX-A-409,anomaly,Combined Multi-System Abnormality,"Glucose, CBC, liver, kidney, and electrolytes are all affected.",mixed-combined-02
+MIX-N-005,anomaly_free,Routine Panel - Normal,Normal CBC with stable chemistry and glucose.,mixed-cbc-normal-variant
+MIX-A-410,anomaly,Metabolic Risk Shift,Mixed lipid and glucose abnormalities with mild liver strain.,mixed-metabolic-shift
+MIX-A-411,anomaly,Hospital Follow-up Abnormality,Post-discharge panel with lingering multiple abnormalities.,mixed-hospital-followup
