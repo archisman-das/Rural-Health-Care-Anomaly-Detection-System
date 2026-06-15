@@ -12,6 +12,10 @@ The project combines:
 If you want the deeper design and workflow reference, start here:
 
 - [Project documentation](docs/project_documentation.md)
+- [System architecture](docs/architecture.md)
+- [Project scope](docs/project_scope.md)
+- [Research report](docs/research_report.md)
+- [Research report outline](docs/research_report_outline.md)
 - [Model details documentation](docs/model_details.md)
 - [Reference papers](docs/reference.md)
 - [Documentation index](docs/index.md)
@@ -25,7 +29,7 @@ The system follows a simple clinical flow:
 3. Review patient care insights
 4. Compare model behavior and runtime cost
 5. Turn the analysis into decision support
-6. Keep backend processing available for internal review
+6. Keep backend processing hidden for internal review
 7. Finish with the model analytical hub
 
 The goal is not only to detect anomalies, but to present them clearly enough that a clinician or reviewer can understand what changed and what to do next.
@@ -71,6 +75,10 @@ The docs explain:
 ## Documentation Links
 
 - [Project documentation](docs/project_documentation.md)
+- [System architecture](docs/architecture.md)
+- [Project scope](docs/project_scope.md)
+- [Research report](docs/research_report.md)
+- [Research report outline](docs/research_report_outline.md)
 - [Model details documentation](docs/model_details.md)
 - [Reference papers](docs/reference.md)
 - [Feature provenance](docs/feature_provenance.md)
@@ -234,11 +242,10 @@ It includes:
 - Reference guidance
 - Model consensus
 - Consensus risk map
-- Clinician feedback
 
 ### Step 6. Backend Processing
 
-This stage remains part of the internal workflow.
+This stage remains part of the internal workflow, but it is hidden from the main user flow.
 
 It documents:
 
@@ -259,6 +266,7 @@ It groups:
 - Model rankings
 - Comparison outputs
 - Final review notes
+- Latent manifold and reconstruction residual views
 
 ## Sample Data And Test Reports
 

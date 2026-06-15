@@ -311,11 +311,10 @@ It includes:
 - Reference guidance
 - Consensus display
 - Consensus risk map
-- Clinician feedback input
 
 The language is intended to be concise and usable by a human reviewer, not only by a technical operator.
 
-The decision support screen is where the system stops being descriptive and becomes actionable. It does not just show the score; it shows what to do next.
+The decision support screen is where the system stops being descriptive and becomes actionable. It does not just show the score; it shows what to do next, and the current UI automatically fills the conformal verdict and drift-related fields when backend scoring data is available.
 
 ### Step 6: Backend Processing
 
@@ -343,6 +342,8 @@ It is used to inspect:
 - Banding and ranking
 - Comparison outputs
 - Final review notes
+- Latent manifold projection
+- Reconstruction residual heatmaps
 
 It serves as the wrap-up view for comparing trained model families and reviewing the strongest candidate before finalizing the flow.
 
@@ -689,7 +690,7 @@ Key behaviors:
 
 - Recommendations should appear automatically after analysis
 - Consensus should be readable at a glance
-- Feedback should be easy to submit and review
+- Conformal and drift summaries should stay visible when backend values exist
 
 ## Operational Notes
 

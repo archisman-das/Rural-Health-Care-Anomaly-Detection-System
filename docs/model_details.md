@@ -312,6 +312,46 @@ After the model produces an anomaly score, the training/scoring layer adds the c
 
 This means the output is not just a raw model score. It is turned into something that is easier to use in a workflow.
 
+## Conformal Anomaly Detection
+
+The dashboard can also surface a conformal-style verdict when backend prediction data includes a calibration-derived score.
+
+The conformal path works like this:
+
+1. Use held-out calibration residuals or reconstruction errors as nonconformity scores.
+2. Compare the current record against that calibration distribution.
+3. Convert the comparison into a finite-sample p-value.
+4. Present the result as a significance-style statement rather than only a raw float.
+
+In the UI, this shows up as a conformal card with fields such as:
+
+- Raw conformal score
+- P-value
+- Assessment text
+- Significance label
+- Visit sequence length
+- Sequence anomaly score
+- Sequence blend
+- Drift method
+- Score stream drift change point
+
+When those values are missing, the dashboard keeps the card stable with fallback text instead of throwing an error.
+
+## Sequence And Drift Outputs
+
+Some backend responses also include sequence-aware outputs for the decision-support page.
+
+These values are used to summarize whether a record is only unusual in isolation or whether the score stream is drifting over time.
+
+The visible UI can render:
+
+- A short score stream chart
+- The detected drift change point
+- The drift alarm state
+- The drift method name
+
+This helps the dashboard distinguish a one-off outlier from a quiet deterioration pattern.
+
 ## Training, Validation, and Splits
 
 The repository supports train, validation, and test splits in separate folders. The helper functions in `training.py` can:
@@ -339,6 +379,17 @@ The evaluation layer can summarize:
 - Runtime and deployment cost
 
 It also highlights the rows where detectors disagree most, which is useful for manual review.
+
+## Dashboard Visual Explanations
+
+The web dashboard surfaces several explanation-oriented views that are derived from the model outputs:
+
+- A latent manifold projection from the VAE encoder
+- A highlighted current test record in that 2D projection
+- A reconstruction residual heatmap for reconstruction-based models
+- Compact score and anomaly distribution views in the patient-care screen
+
+These views are not separate detectors by themselves. They are presentation layers for the latent space and residual structure already produced by the models.
 
 ## How To Read The Models Together
 
