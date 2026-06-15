@@ -381,6 +381,7 @@ These pages show examples for:
 - Autoencoder tuning
 - Variational autoencoder tuning
 - Deep SVDD architecture choices
+- Stacking meta-model selection and hidden-layer sizing
 - Ensemble fusion weights
 - Risk scoring weights
 - Stacking and max-score-voting modes

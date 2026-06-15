@@ -125,7 +125,7 @@ _MODEL_HELP = (
     "    - moe_gate_l2: L2 regularization strength for the gate\n"
     "    - moe_gate_random_state: random seed for the gate\n"
     "    - moe_gate_verbose: enable or disable verbose gate training logs\n"
-    "    - stacking uses a labeled set to train a logistic regression meta-classifier"
+    "    - stacking uses a labeled set to train a nonlinear meta-model"
 )
 
 
@@ -683,6 +683,49 @@ def _add_ensemble_fusion_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Override the variational autoencoder contribution inside weighted ensemble fusion.",
     )
+    parser.add_argument(
+        "--stacking-meta-model-type",
+        choices=("mlp", "xgboost", "auto"),
+        default=None,
+        help="Choose the stacking meta-model family used to combine detector scores.",
+    )
+    parser.add_argument(
+        "--stacking-hidden-layer-sizes",
+        nargs="+",
+        type=int,
+        default=None,
+        help="Hidden layer sizes used by the default MLP stacking meta-model.",
+    )
+    parser.add_argument(
+        "--stacking-alpha",
+        type=float,
+        default=None,
+        help="L2 regularization strength for the stacking meta-model.",
+    )
+    parser.add_argument(
+        "--stacking-learning-rate-init",
+        type=float,
+        default=None,
+        help="Initial learning rate for the stacking meta-model.",
+    )
+    parser.add_argument(
+        "--stacking-max-iter",
+        type=int,
+        default=None,
+        help="Maximum number of training iterations for the stacking meta-model.",
+    )
+    parser.add_argument(
+        "--stacking-random-state",
+        type=int,
+        default=None,
+        help="Random seed for the stacking meta-model.",
+    )
+    parser.add_argument(
+        "--stacking-verbose",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable verbose stacking meta-model training logs.",
+    )
 
 
 def _add_label_arguments(parser: argparse.ArgumentParser) -> None:
@@ -872,11 +915,21 @@ def _apply_ensemble_fusion_overrides(config: PreprocessingConfig, args: argparse
         "anomaly_transformer_weight",
         "ganomaly_weight",
         "vae_weight",
+        "stacking_meta_model_type",
+        "stacking_alpha",
+        "stacking_learning_rate_init",
+        "stacking_max_iter",
+        "stacking_random_state",
+        "stacking_verbose",
     ]
     for field_name in field_names:
         value = getattr(args, field_name, None)
         if value is not None:
             setattr(config, field_name, value)
+
+    hidden_layer_sizes = getattr(args, "stacking_hidden_layer_sizes", None)
+    if hidden_layer_sizes is not None:
+        config.stacking_hidden_layer_sizes = tuple(int(value) for value in hidden_layer_sizes)
 
 
 def _apply_threshold_calibration_overrides(config: PreprocessingConfig, args: argparse.Namespace) -> None:

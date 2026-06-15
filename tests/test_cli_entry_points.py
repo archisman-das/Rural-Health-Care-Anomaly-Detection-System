@@ -1154,6 +1154,19 @@ class CliEntryPointTests(unittest.TestCase):
                     str(config_path),
                     "--ensemble-fusion-strategy",
                     "stacking",
+                    "--stacking-meta-model-type",
+                    "mlp",
+                    "--stacking-hidden-layer-sizes",
+                    "16",
+                    "8",
+                    "--stacking-alpha",
+                    "0.0005",
+                    "--stacking-learning-rate-init",
+                    "0.002",
+                    "--stacking-max-iter",
+                    "150",
+                    "--stacking-random-state",
+                    "7",
                     "--label-column",
                     "label",
                 ],
@@ -1165,6 +1178,13 @@ class CliEntryPointTests(unittest.TestCase):
             self.assertEqual(model.fusion_strategy, "stacking")
             self.assertTrue(hasattr(model, "stacking_meta_model_"))
             self.assertEqual(model.fusion_strategy_, "stacking")
+            self.assertEqual(model.stacking_meta_model_type, "mlp")
+            self.assertEqual(model.stacking_meta_model_type_, "MLPClassifier")
+            self.assertEqual(model.stacking_hidden_layer_sizes, (16, 8))
+            self.assertAlmostEqual(model.stacking_alpha, 0.0005)
+            self.assertAlmostEqual(model.stacking_learning_rate_init, 0.002)
+            self.assertEqual(model.stacking_max_iter, 150)
+            self.assertEqual(model.stacking_random_state, 7)
 
     def test_train_cli_supports_stacking_labels_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1190,6 +1210,8 @@ class CliEntryPointTests(unittest.TestCase):
                     str(config_path),
                     "--ensemble-fusion-strategy",
                     "stacking",
+                    "--stacking-meta-model-type",
+                    "mlp",
                     "--labels-file",
                     str(labels_path),
                     "--labels-column",
