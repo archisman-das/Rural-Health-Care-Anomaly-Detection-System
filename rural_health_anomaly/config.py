@@ -34,6 +34,13 @@ class PreprocessingConfig:
     calibrate_threshold: bool = True
     calibration_min_samples: int = 25
     ensemble_fusion_weights: dict[str, float] | None = None
+    stacking_meta_model_type: str = "mlp"
+    stacking_hidden_layer_sizes: tuple[int, ...] = (32, 16)
+    stacking_alpha: float = 1e-4
+    stacking_learning_rate_init: float = 1e-3
+    stacking_max_iter: int = 500
+    stacking_random_state: int = 42
+    stacking_verbose: bool = False
     moe_gate_hidden_dim: int = 32
     moe_gate_dropout: float = 0.1
     moe_gate_learning_rate: float = 1e-3

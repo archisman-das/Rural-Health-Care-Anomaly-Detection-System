@@ -116,6 +116,7 @@ def _fuse_scores(
     *,
     transformed: np.ndarray | None = None,
     gate_model: Any | None = None,
+    stacking_meta_model: Any | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     strategy = manifest.get("fusion_strategy", "weighted_average")
     weights_map = {str(key): float(value) for key, value in manifest.get("fusion_weights", {}).items()}
@@ -137,15 +138,34 @@ def _fuse_scores(
     elif strategy == "stacking":
         stacking = manifest.get("stacking_meta_model") or {}
         feature_order = list(stacking.get("feature_order", component_names))
-        feature_indices = [component_names.index(name) for name in feature_order if name in component_names]
-        if not feature_indices:
+        feature_index_map = {name: idx for idx, name in enumerate(component_names)}
+        if not feature_order:
             raise RuntimeError("Stacking metadata is missing component feature ordering.")
-        features = matrix[:, feature_indices]
-        coef = np.asarray(stacking.get("coef", [[0.0] * features.shape[1]]), dtype=float)
-        intercept = np.asarray(stacking.get("intercept", [0.0]), dtype=float)
-        logit = features @ coef.reshape(-1, 1)
-        logit = logit.reshape(-1) + float(intercept.reshape(-1)[0])
-        fused = 1.0 / (1.0 + np.exp(-logit))
+        feature_columns: list[np.ndarray] = []
+        for name in feature_order:
+            if name in feature_index_map:
+                feature_columns.append(matrix[:, feature_index_map[name]])
+            else:
+                feature_columns.append(np.full(matrix.shape[0], 0.5, dtype=float))
+        features = np.column_stack(feature_columns)
+        expected_features = getattr(stacking_meta_model, "n_features_in_", None)
+        if expected_features is not None and int(expected_features) != features.shape[1]:
+            expected_features = int(expected_features)
+            if features.shape[1] > expected_features:
+                features = features[:, :expected_features]
+            else:
+                pad_width = expected_features - features.shape[1]
+                if pad_width > 0:
+                    padding = np.full((features.shape[0], pad_width), 0.5, dtype=float)
+                    features = np.column_stack([features, padding])
+        if stacking_meta_model is not None and hasattr(stacking_meta_model, "predict_proba"):
+            fused = np.asarray(stacking_meta_model.predict_proba(features), dtype=float)[:, 1]
+        else:
+            coef = np.asarray(stacking.get("coef", [[0.0] * features.shape[1]]), dtype=float)
+            intercept = np.asarray(stacking.get("intercept", [0.0]), dtype=float)
+            logit = features @ coef.reshape(-1, 1)
+            logit = logit.reshape(-1) + float(intercept.reshape(-1)[0])
+            fused = 1.0 / (1.0 + np.exp(-logit))
     elif strategy == "moe":
         if gate_model is not None and transformed is not None:
             gate_weights = np.asarray(gate_model.predict_proba(transformed), dtype=float)
@@ -208,6 +228,7 @@ def score_bundle_frame(bundle: EdgeBundle, data: pd.DataFrame) -> pd.DataFrame:
         component_names,
         transformed=transformed_array,
         gate_model=bundle.python_models.get("moe_gate"),
+        stacking_meta_model=bundle.python_models.get("stacking_meta_model"),
     )
 
     output = data.copy().reset_index(drop=True)

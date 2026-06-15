@@ -292,6 +292,7 @@ The project compares multiple detectors, including:
 - Anomaly Transformer
 - Deep SVDD
 - Mixture-of-Experts gate
+- Nonlinear stacking meta-model
 
 The model comparison views show:
 
@@ -300,6 +301,7 @@ The model comparison views show:
 - Recall
 - F1
 - Gate weights for MoE runs
+- Stacking meta-model probability
 - Latency
 - Memory
 - Family and band

@@ -397,6 +397,9 @@ class PreprocessingAndPipelineBuilderTests(unittest.TestCase):
         config = PreprocessingConfig(
             apply_pca=False,
             ensemble_fusion_strategy="stacking",
+            stacking_meta_model_type="mlp",
+            stacking_hidden_layer_sizes=(16,),
+            stacking_max_iter=200,
         )
         labels = np.array([0, 0, 1])
         pipeline = build_anomaly_pipeline(config)
@@ -409,6 +412,8 @@ class PreprocessingAndPipelineBuilderTests(unittest.TestCase):
 
         self.assertEqual(model.fusion_strategy_, "stacking")
         self.assertTrue(hasattr(model, "stacking_meta_model_"))
+        self.assertTrue(hasattr(model.stacking_meta_model_, "predict_proba"))
+        self.assertEqual(getattr(model, "stacking_meta_model_type_", None), type(model.stacking_meta_model_).__name__)
         self.assertTrue(np.all((fused_scores >= 0.0) & (fused_scores <= 1.0)))
         self.assertTrue(np.all(np.isfinite(scores)))
         self.assertEqual(model.predict(transformed).shape[0], len(self.df))

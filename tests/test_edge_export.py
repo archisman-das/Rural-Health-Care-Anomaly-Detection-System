@@ -62,6 +62,38 @@ class EdgeExportTests(unittest.TestCase):
             self.assertEqual(Path(exported["variational_autoencoder_onnx"]).name, variational_autoencoder_path.name)
             self.assertEqual(Path(exported["ganomaly_joblib"]).name, ganomaly_path.name)
 
+    @unittest.skipUnless(
+        importlib.util.find_spec("onnx") is not None and importlib.util.find_spec("skl2onnx") is not None,
+        "onnx export dependencies are not installed",
+    )
+    def test_export_edge_bundle_writes_stacking_meta_model_bundle(self):
+        config = PreprocessingConfig(
+            apply_pca=False,
+            deep_svdd_pretrain_autoencoder=False,
+            ensemble_fusion_strategy="stacking",
+            stacking_meta_model_type="mlp",
+            stacking_hidden_layer_sizes=(16,),
+            stacking_max_iter=200,
+        )
+        data = build_training_data()
+        labels = [0] * len(data)
+        if labels:
+            labels[-1] = 1
+        pipeline = train_anomaly_pipeline(data, y=labels, config=config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            exported = export_edge_bundle(pipeline, output_dir)
+
+            manifest_path = output_dir / "edge_bundle_manifest.json"
+            stacking_path = output_dir / "stacking_meta_model.joblib"
+
+            self.assertTrue(manifest_path.exists())
+            self.assertTrue(stacking_path.exists())
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertIn("stacking_meta_model", manifest["artifacts"])
+            self.assertEqual(Path(exported["stacking_meta_model_joblib"]).name, stacking_path.name)
+
 
 if __name__ == "__main__":
     unittest.main()

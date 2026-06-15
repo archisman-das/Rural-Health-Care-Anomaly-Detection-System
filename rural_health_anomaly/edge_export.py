@@ -511,11 +511,18 @@ def export_edge_bundle(pipeline: Any, output_dir: str | Path, *, opset: int = 13
 
     if getattr(model, "fusion_strategy_", getattr(model, "fusion_strategy", None)) == "stacking" and hasattr(model, "stacking_meta_model_"):
         meta_model = model.stacking_meta_model_
+        stacking_meta_model_path = output_path / "stacking_meta_model.joblib"
+        joblib.dump(meta_model, stacking_meta_model_path)
+        exported_files["stacking_meta_model_joblib"] = str(stacking_meta_model_path)
         manifest["stacking_meta_model"] = {
-            "classes": [int(value) for value in getattr(meta_model, "classes_", [])],
-            "coef": np.asarray(getattr(meta_model, "coef_", np.empty((0, 0))), dtype=float).tolist(),
-            "intercept": np.asarray(getattr(meta_model, "intercept_", np.empty((0,))), dtype=float).tolist(),
+            "joblib": stacking_meta_model_path.name,
             "feature_order": list(getattr(model, "component_names_", [])),
+            "model_type": type(meta_model).__name__,
+            "stacking_meta_model_type": getattr(model, "stacking_meta_model_type_", getattr(model, "stacking_meta_model_type", "mlp")),
+        }
+        manifest["artifacts"]["stacking_meta_model"] = {
+            "joblib": stacking_meta_model_path.name,
+            "model_type": type(meta_model).__name__,
         }
 
     if getattr(model, "fusion_strategy_", getattr(model, "fusion_strategy", None)) == "moe" and hasattr(model, "moe_gate_"):

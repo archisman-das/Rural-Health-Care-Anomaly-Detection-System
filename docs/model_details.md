@@ -275,7 +275,14 @@ The fused score becomes the maximum component score. This mode is more conservat
 
 ### Stacking
 
-If labeled data is available, the ensemble can train a logistic regression meta-model on top of the component scores.
+If labeled data is available, the ensemble can train a nonlinear meta-model on top of the component scores.
+
+In the current implementation, stacking uses a nonlinear meta-model by default:
+
+- A shallow MLP when the project dependencies are used as-is
+- XGBoost when it is available and selected through configuration
+
+The meta-model sees the detector score vector as features and learns how to combine them into a better final anomaly probability.
 
 ### Threshold calibration
 

@@ -8,8 +8,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, OutlierMixin, clone
-from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
 from sklearn.utils.parallel import Parallel, delayed
 
 from .autoencoder import DeepAutoencoder
@@ -76,6 +76,12 @@ def _normalize_rows(matrix: np.ndarray) -> np.ndarray:
     row_sums = np.sum(matrix, axis=1, keepdims=True)
     row_sums = np.where(~np.isfinite(row_sums) | (row_sums <= 0.0), 1.0, row_sums)
     return matrix / row_sums
+
+
+def _clone_meta_model(model: Any) -> Any:
+    if hasattr(model, "get_params"):
+        return clone(model)
+    return model
 
 
 def _coerce_binary_labels(y: Any) -> np.ndarray:
@@ -342,6 +348,13 @@ class ParallelAnomalyEnsemble(BaseEstimator, OutlierMixin):
         calibrate_threshold: bool = True,
         calibration_min_samples: int = 25,
         fusion_weights: dict[str, float] | None = None,
+        stacking_meta_model_type: str = "mlp",
+        stacking_hidden_layer_sizes: tuple[int, ...] = (32, 16),
+        stacking_alpha: float = 1e-4,
+        stacking_learning_rate_init: float = 1e-3,
+        stacking_max_iter: int = 500,
+        stacking_random_state: int = 42,
+        stacking_verbose: bool = False,
         moe_gate_hidden_dim: int = 32,
         moe_gate_dropout: float = 0.1,
         moe_gate_learning_rate: float = 1e-3,
@@ -450,6 +463,13 @@ class ParallelAnomalyEnsemble(BaseEstimator, OutlierMixin):
         self.calibrate_threshold = calibrate_threshold
         self.calibration_min_samples = calibration_min_samples
         self.fusion_weights = fusion_weights
+        self.stacking_meta_model_type = stacking_meta_model_type
+        self.stacking_hidden_layer_sizes = stacking_hidden_layer_sizes
+        self.stacking_alpha = stacking_alpha
+        self.stacking_learning_rate_init = stacking_learning_rate_init
+        self.stacking_max_iter = stacking_max_iter
+        self.stacking_random_state = stacking_random_state
+        self.stacking_verbose = stacking_verbose
         self.moe_gate_hidden_dim = moe_gate_hidden_dim
         self.moe_gate_dropout = moe_gate_dropout
         self.moe_gate_learning_rate = moe_gate_learning_rate
@@ -703,6 +723,51 @@ class ParallelAnomalyEnsemble(BaseEstimator, OutlierMixin):
         fitted = _fit_estimator(estimator, X)
         return name, fitted
 
+    def _build_stacking_meta_model(self, *, n_samples: int | None = None):
+        meta_model_type = str(self.stacking_meta_model_type or "mlp").lower()
+        if meta_model_type not in {"mlp", "xgboost", "auto"}:
+            raise ValueError("stacking_meta_model_type must be 'mlp', 'xgboost', or 'auto'")
+
+        if meta_model_type in {"xgboost", "auto"}:
+            try:
+                import xgboost as xgb  # type: ignore
+
+                return xgb.XGBClassifier(
+                    objective="binary:logistic",
+                    n_estimators=150,
+                    max_depth=3,
+                    learning_rate=0.08,
+                    subsample=0.9,
+                    colsample_bytree=0.9,
+                    reg_lambda=1.0,
+                    random_state=self.stacking_random_state,
+                    n_jobs=self.n_jobs,
+                    eval_metric="logloss",
+                    tree_method="hist",
+                )
+            except Exception:
+                if meta_model_type == "xgboost":
+                    raise RuntimeError(
+                        "xgboost is not installed, so stacking_meta_model_type='xgboost' cannot be used."
+                    )
+
+        hidden_layers = tuple(int(value) for value in self.stacking_hidden_layer_sizes) or (32, 16)
+        use_early_stopping = bool(n_samples is not None and n_samples >= 20)
+        return MLPClassifier(
+            hidden_layer_sizes=hidden_layers,
+            activation="relu",
+            solver="adam",
+            alpha=float(self.stacking_alpha),
+            batch_size="auto",
+            learning_rate_init=float(self.stacking_learning_rate_init),
+            max_iter=int(self.stacking_max_iter),
+            random_state=self.stacking_random_state,
+            verbose=bool(self.stacking_verbose),
+            early_stopping=use_early_stopping,
+            validation_fraction=0.2,
+            n_iter_no_change=max(10, int(self.stacking_max_iter // 10)),
+        )
+
     def _build_moe_targets(self, component_matrix: np.ndarray, labels: np.ndarray | None) -> tuple[np.ndarray, str]:
         if labels is not None:
             labels_binary = _coerce_binary_labels(labels)
@@ -800,14 +865,14 @@ class ParallelAnomalyEnsemble(BaseEstimator, OutlierMixin):
                 raise ValueError("Stacking labels must have the same number of rows as X.")
 
             stacking_features = self._stacking_feature_matrix(component_matrix)
-            self.stacking_meta_model_ = LogisticRegression(
-                solver="lbfgs",
-                max_iter=1000,
-                class_weight="balanced",
-            )
-            self.stacking_meta_model_.fit(stacking_features, labels)
-            fused = self.stacking_meta_model_.predict_proba(stacking_features)[:, 1]
-            self.offset_ = 0.5
+            self.stacking_meta_model_ = self._build_stacking_meta_model(n_samples=stacking_features.shape[0])
+            meta_labels = np.asarray(labels, dtype=int).reshape(-1)
+            meta_model = _clone_meta_model(self.stacking_meta_model_)
+            meta_model.fit(stacking_features, meta_labels)
+            self.stacking_meta_model_ = meta_model
+            fused = np.asarray(self.stacking_meta_model_.predict_proba(stacking_features), dtype=float)[:, 1]
+            self.offset_ = float(np.quantile(fused, 1 - self.contamination))
+            self.stacking_meta_model_type_ = type(self.stacking_meta_model_).__name__
 
         should_calibrate = (
             self.calibrate_threshold
@@ -877,7 +942,7 @@ class ParallelAnomalyEnsemble(BaseEstimator, OutlierMixin):
             if not hasattr(self, "stacking_meta_model_"):
                 raise RuntimeError("Stacking fusion requires a fitted meta-classifier.")
             features = self._stacking_feature_matrix(matrix)
-            return self.stacking_meta_model_.predict_proba(features)[:, 1]
+            return np.asarray(self.stacking_meta_model_.predict_proba(features), dtype=float)[:, 1]
         if self.fusion_strategy_ == "max_score_voting":
             return np.max(matrix, axis=1)
         if self.fusion_strategy_ == "moe":
