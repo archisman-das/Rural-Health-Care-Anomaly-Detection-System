@@ -240,6 +240,22 @@ class VariationalAutoencoder(BaseEstimator, OutlierMixin):
         recon, _ = self._forward(X, training=False)
         return np.mean(np.abs(recon - X), axis=1)
 
+    def reconstruction_residuals(self, X: Any) -> np.ndarray:
+        if not hasattr(self, "weights_"):
+            raise RuntimeError("Variational autoencoder must be fit before scoring.")
+        X = np.asarray(X, dtype=float)
+        recon, _ = self._forward(X, training=False)
+        return recon - X
+
+    def latent_embedding(self, X: Any, *, use_mean: bool = True) -> np.ndarray:
+        """Return the latent code for each sample."""
+
+        if not hasattr(self, "weights_"):
+            raise RuntimeError("Variational autoencoder must be fit before scoring.")
+        X = np.asarray(X, dtype=float)
+        _, cache = self._forward(X, training=False)
+        return cache.mu if use_mean else cache.latent
+
     def fit(self, X, y=None):
         X = np.asarray(X, dtype=float)
         if X.ndim != 2:

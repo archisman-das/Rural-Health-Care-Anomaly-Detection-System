@@ -234,6 +234,13 @@ class GANomaly(BaseEstimator, OutlierMixin):
             raise RuntimeError("GANomaly must be fit before scoring.")
         return self._latent_consistency_error(np.asarray(X, dtype=float))
 
+    def reconstruction_residuals(self, X: Any) -> np.ndarray:
+        if not hasattr(self, "weights_"):
+            raise RuntimeError("GANomaly must be fit before scoring.")
+        X = np.asarray(X, dtype=float)
+        _, cache = self._forward(X, training=False)
+        return cache.recon - X
+
     def raw_score(self, X: Any) -> np.ndarray:
         if not hasattr(self, "weights_"):
             raise RuntimeError("GANomaly must be fit before scoring.")

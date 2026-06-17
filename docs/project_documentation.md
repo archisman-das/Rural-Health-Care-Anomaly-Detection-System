@@ -173,6 +173,15 @@ The Python side owns the anomaly detection logic and artifacts. The web side own
 
 The web dashboard is structured as a guided clinical workflow.
 
+| Step | Screen | Key behavior |
+| --- | --- | --- |
+| 1 | Patient Details | Collects patient context and mandatory bedside inputs before the user can continue. |
+| 2 | Lab Investigation | Accepts manual or uploaded labs and stays available even when only partial data is entered. |
+| 3 | Patient Care Insights | Shows compact, responsive cards for severity, anomaly position, and bubble summaries. |
+| 4 | Comparative Analysis | Compares models, latency, memory, and score spread in a mobile-style stacked layout. |
+| 5 | Decision Support | Turns model output into action-oriented recommendations and risk guidance. |
+| 6 | Model Analytical Hub | Shows model inventory, latent manifold, and reconstruction residuals for final review. |
+
 ### Step 1: Patient Details
 
 This step captures the minimum required patient context.
@@ -201,6 +210,13 @@ The BMI value is shown as `0.00` until weight and height are both supplied.
 
 The screen is intentionally simple and supports quick bedside intake. The optional identity fields help with record keeping, while the required clinical fields drive the actual workflow progress.
 
+The Continue button remains disabled until the mandatory intake and bedside labs are complete.
+
+Required bedside labs on Step 1:
+
+- Hemoglobin
+- Blood glucose
+
 ### Step 2: Lab Investigation
 
 This step supports:
@@ -211,11 +227,7 @@ This step supports:
 
 The lab uploader parses the report and auto-fills matching fields.
 
-The required lab fields are:
-
-- Fasting glucose
-- Postprandial glucose
-- Hemoglobin
+There are no blocking required fields on Step 2. The step is designed to work with partial lab data, uploaded reports, or manually entered values.
 
 The remaining lab fields are optional and can be provided when available:
 
@@ -237,7 +249,7 @@ The remaining lab fields are optional and can be provided when available:
 - Chloride
 - Bicarbonate
 
-The page also shows validation guidance so the user knows what is required before moving on.
+The page also shows validation guidance so the user knows what is optional and what the uploader can auto-fill.
 
 The upload parser is designed to recognize the same field names that the dashboard renders, so a generated report or a manually prepared test file can auto-fill the form without extra mapping.
 
@@ -274,6 +286,12 @@ The patient-care view includes:
 - Anomaly position map
 - Bubble and ranking summaries
 
+| Card | Purpose | Responsive note |
+| --- | --- | --- |
+| Anomaly position map | Places the current record across body systems and severity zones. | Uses a compact stacked layout so labels do not overlap. |
+| Anomaly bubbles | Shows the strongest feature-level signals. | Expands flexibly as more bubbles are added. |
+| Residual-style summaries | Highlights how the strongest signals compare. | Text wraps to avoid collisions on mobile and desktop. |
+
 ### Step 4: Comparative Analysis
 
 This step compares multiple detector families and model behavior.
@@ -298,6 +316,12 @@ These cards are deliberately designed to be explanation-rich, not just chart-hea
 
 The comparison matrix shows the model ranking and metric balance. Operational cost shows the runtime burden. Before / after shows run-to-run change. Narrative translates the numbers into a practical reading.
 
+| Comparison area | What changed |
+| --- | --- |
+| Active area | The primary workspace and reference area are separated into clear rows rather than crowded grids. |
+| Supporting context | The supporting cards are stacked and resized to prevent overlap. |
+| Layout behavior | Mobile-style spacing is used more consistently across screen sizes. |
+
 ### Step 5: Decision Support
 
 This page turns the comparative output into guidance.
@@ -316,22 +340,13 @@ The language is intended to be concise and usable by a human reviewer, not only 
 
 The decision support screen is where the system stops being descriptive and becomes actionable. It does not just show the score; it shows what to do next, and the current UI automatically fills the conformal verdict and drift-related fields when backend scoring data is available.
 
-### Step 6: Backend Processing
+| Decision card | Purpose |
+| --- | --- |
+| Recommendation summary | Shows the highest-level suggestion for the current case. |
+| Consensus strip | Summarizes the model agreement. |
+| Risk map | Places the decision in a safety-oriented view for quick review. |
 
-The backend processing stage exists as an internal or hidden workflow stage.
-
-Its purpose is to document:
-
-- Preprocessing
-- Feature engineering
-- Scaling and validation
-- Model-ready transformation steps
-
-The stage is hidden from the main user flow in the current dashboard UX, but the logic remains part of the project structure.
-
-This hidden stage is still important for debugging and future enhancements, because it documents how the raw form data becomes model-ready input.
-
-### Step 7: Model Analytical Hub
+### Step 6: Model Analytical Hub
 
 The final stage acts as a model review hub.
 
@@ -346,6 +361,12 @@ It is used to inspect:
 - Reconstruction residual heatmaps
 
 It serves as the wrap-up view for comparing trained model families and reviewing the strongest candidate before finalizing the flow.
+
+| Hub card | What it shows | Current behavior |
+| --- | --- | --- |
+| Model inventory | ML and DL families with score, accuracy, latency, memory, and AUC. | The top score badge now matches the displayed accuracy metric. |
+| Latent manifold | VAE latents projected to 2D with a Deep SVDD boundary overlay. | The card is compacted and keeps the current record visible. |
+| Residuals | Per-feature reconstruction errors. | The matrix and the explanation panel are constrained so they do not overflow the card. |
 
 ## Lab Report Dataset Support
 

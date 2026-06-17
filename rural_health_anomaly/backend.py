@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile, status
 from fastapi.encoders import jsonable_encoder
@@ -16,6 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .feedback import append_feedback_records
 from .training import load_pipeline, score_records
+from .training import _compute_latent_manifold
+from .training import _compute_reconstruction_residual_heatmap
 
 
 def _score_payload(pipeline, payload: dict[str, Any] | list[dict[str, Any]]) -> pd.DataFrame:
@@ -94,6 +97,107 @@ def _build_explanation_rows(
     return rows
 
 
+def _build_interaction_heatmap(
+    *,
+    feature_names: list[str],
+    matrix: np.ndarray,
+    top_k: int,
+) -> dict[str, Any]:
+    matrix = np.asarray(matrix, dtype=float)
+    if matrix.ndim != 2 or matrix.shape[0] == 0 or matrix.shape[1] == 0:
+        return {
+            "method": "unavailable",
+            "feature_names": [],
+            "matrix": [],
+            "top_pairs": [],
+            "top_features": [],
+        }
+
+    matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
+    matrix = 0.5 * (matrix + matrix.T)
+    if matrix.shape[0] == matrix.shape[1]:
+        matrix = matrix.copy()
+        matrix[np.diag_indices(matrix.shape[0])] = np.diag(matrix)
+
+    feature_strength = np.sum(np.abs(matrix), axis=1)
+    ranked_indices = sorted(
+        range(len(feature_names)),
+        key=lambda idx: float(feature_strength[idx]),
+        reverse=True,
+    )[: max(1, int(top_k))]
+    ranked_names = [feature_names[idx] for idx in ranked_indices]
+    ranked_matrix = matrix[np.ix_(ranked_indices, ranked_indices)]
+
+    top_pairs: list[dict[str, Any]] = []
+    for i in range(len(ranked_indices)):
+        for j in range(i + 1, len(ranked_indices)):
+            interaction_value = float(ranked_matrix[i, j])
+            top_pairs.append(
+                {
+                    "feature_i": ranked_names[i],
+                    "feature_j": ranked_names[j],
+                    "interaction_value": interaction_value,
+                    "absolute_interaction_value": float(abs(interaction_value)),
+                }
+            )
+
+    top_pairs = sorted(top_pairs, key=lambda item: item["absolute_interaction_value"], reverse=True)[: max(1, int(top_k))]
+    return {
+        "method": "tree_shap_interaction",
+        "feature_names": ranked_names,
+        "matrix": ranked_matrix.tolist(),
+        "top_pairs": top_pairs,
+        "top_features": [
+            {
+                "feature": ranked_names[idx],
+                "interaction_strength": float(feature_strength[ranked_indices[idx]]),
+            }
+            for idx in range(len(ranked_indices))
+        ],
+    }
+
+
+def _build_fallback_interaction_heatmap(
+    *,
+    feature_names: list[str],
+    values: list[float],
+    transformed_patient: np.ndarray,
+    background_transformed: np.ndarray,
+    top_k: int,
+) -> dict[str, Any]:
+    transformed_patient = np.asarray(transformed_patient, dtype=float)
+    background_transformed = np.asarray(background_transformed, dtype=float)
+    if transformed_patient.ndim != 2 or transformed_patient.shape[1] == 0:
+        return {
+            "method": "unavailable",
+            "feature_names": [],
+            "matrix": [],
+            "top_pairs": [],
+            "top_features": [],
+        }
+
+    centered = transformed_patient[0] - np.nanmean(background_transformed, axis=0)
+    interaction_matrix = np.outer(centered, centered)
+    if np.any(np.isfinite(interaction_matrix)) and np.max(np.abs(interaction_matrix)) > 0:
+        interaction_matrix = interaction_matrix / float(np.max(np.abs(interaction_matrix)))
+
+    scale = float(max(np.max(np.abs(values)) if values else 0.0, 1e-6))
+    interaction_matrix = interaction_matrix * scale
+    return {
+        "method": "deviation_outer_product_fallback",
+        "feature_names": feature_names[: interaction_matrix.shape[0]],
+        "matrix": interaction_matrix.tolist(),
+        "top_pairs": [],
+        "top_features": [
+            {
+                "feature": feature_name,
+                "interaction_strength": float(abs(value)),
+            }
+            for feature_name, value in zip(feature_names[: len(values)], values, strict=False)
+        ][: max(1, int(top_k))],
+    }
+
+
 def _compute_feature_explanation(
     pipeline,
     patient: dict[str, Any],
@@ -111,16 +215,53 @@ def _compute_feature_explanation(
 
     method = "ablation_fallback"
     values: list[float]
+    interaction_heatmap: dict[str, Any] | None = None
 
     try:  # pragma: no cover - exercised when shap is available
         import shap  # type: ignore
 
-        explainer = shap.KernelExplainer(lambda x: model.score(x), background_transformed)
-        shap_values = explainer.shap_values(transformed_patient, nsamples=min(100, max(20, transformed_patient.shape[1] * 2)))
-        if isinstance(shap_values, list):
-            shap_values = shap_values[0]
-        values = [float(value) for value in shap_values[0].tolist()]
-        method = "shap_kernel"
+        tree_model = None
+        tree_source = None
+        estimators = getattr(model, "estimators_", {})
+        if isinstance(estimators, dict):
+            isolation_forest = estimators.get("isolation_forest")
+            tree_model = getattr(isolation_forest, "model_", None)
+            if tree_model is not None:
+                tree_source = "isolation_forest"
+
+        if tree_model is not None:
+            background_sample = np.asarray(background_transformed, dtype=float)
+            if background_sample.ndim == 2 and background_sample.shape[0] > 64:
+                background_sample = background_sample[:64]
+            explainer = shap.TreeExplainer(tree_model, data=background_sample)
+            shap_values = explainer.shap_values(transformed_patient)
+            if isinstance(shap_values, list):
+                shap_values = shap_values[0]
+            values = [float(value) for value in np.asarray(shap_values, dtype=float)[0].tolist()]
+            interaction_values = explainer.shap_interaction_values(transformed_patient)
+            if isinstance(interaction_values, list):
+                interaction_values = interaction_values[0]
+            matrix = np.asarray(interaction_values, dtype=float)
+            if matrix.ndim == 3:
+                matrix = matrix[0]
+            interaction_heatmap = _build_interaction_heatmap(
+                feature_names=feature_names,
+                matrix=matrix,
+                top_k=top_k,
+            )
+            if interaction_heatmap["method"] == "tree_shap_interaction":
+                interaction_heatmap["source_model"] = tree_source
+            method = "tree_shap_isolation_forest"
+        else:
+            explainer = shap.KernelExplainer(lambda x: model.score(x), background_transformed)
+            shap_values = explainer.shap_values(
+                transformed_patient,
+                nsamples=min(100, max(20, transformed_patient.shape[1] * 2)),
+            )
+            if isinstance(shap_values, list):
+                shap_values = shap_values[0]
+            values = [float(value) for value in shap_values[0].tolist()]
+            method = "shap_kernel"
     except Exception:
         reference = background_transformed.mean(axis=0, keepdims=True)
         base_score = float(model.score(transformed_patient)[0])
@@ -130,6 +271,13 @@ def _compute_feature_explanation(
             ablated[0, idx] = reference[0, idx]
             ablated_score = float(model.score(ablated)[0])
             values.append(base_score - ablated_score)
+        interaction_heatmap = _build_fallback_interaction_heatmap(
+            feature_names=feature_names,
+            values=values,
+            transformed_patient=transformed_patient,
+            background_transformed=background_transformed,
+            top_k=top_k,
+        )
 
     rows = _build_explanation_rows(
         feature_names=feature_names,
@@ -138,11 +286,20 @@ def _compute_feature_explanation(
         feature_map=feature_map,
         method=method,
     )
+    if interaction_heatmap is None:
+        interaction_heatmap = _build_fallback_interaction_heatmap(
+            feature_names=feature_names,
+            values=values,
+            transformed_patient=transformed_patient,
+            background_transformed=background_transformed,
+            top_k=top_k,
+        )
     return {
         "method": method,
         "top_k": int(top_k),
         "background_size": int(len(background_raw)),
         "feature_explanations": rows,
+        "interaction_heatmap": interaction_heatmap,
     }
 
 
@@ -454,7 +611,52 @@ def _build_dashboard_data(app: FastAPI) -> dict[str, Any]:
     payload["dashboardState"] = "Clinical dashboard ready"
     payload["lastUpdated"] = _dashboard_last_updated()
     payload["feedbackCount"] = feedback_count
+    payload["modelConfig"] = getattr(app.state, "latest_model_config", None)
     return payload
+
+
+def _normalize_model_config(payload: dict[str, Any]) -> dict[str, Any]:
+    hidden_layers = payload.get("stacking_hidden_layer_sizes", [32, 16])
+    if isinstance(hidden_layers, str):
+        hidden_layers = [item.strip() for item in hidden_layers.split(",") if item.strip()]
+
+    normalized_layers: list[int] = []
+    hidden_layer_values = hidden_layers if isinstance(hidden_layers, (list, tuple)) else [hidden_layers]
+    for value in hidden_layer_values:
+        try:
+            layer = int(value)
+        except (TypeError, ValueError):
+            continue
+        if layer > 0:
+            normalized_layers.append(layer)
+
+    def _float_value(value: Any, default: float) -> float:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return default
+        return number if number >= 0 else default
+
+    def _int_value(value: Any, default: int) -> int:
+        try:
+            number = int(float(value))
+        except (TypeError, ValueError):
+            return default
+        return number if number > 0 else default
+
+    meta_model_type = str(payload.get("stacking_meta_model_type") or "mlp").strip().lower()
+    if meta_model_type not in {"mlp", "xgboost", "auto"}:
+        meta_model_type = "mlp"
+
+    return {
+        "stacking_meta_model_type": meta_model_type,
+        "stacking_hidden_layer_sizes": normalized_layers or [32, 16],
+        "stacking_alpha": _float_value(payload.get("stacking_alpha"), 1e-4),
+        "stacking_learning_rate_init": _float_value(payload.get("stacking_learning_rate_init"), 1e-3),
+        "stacking_max_iter": _int_value(payload.get("stacking_max_iter"), 500),
+        "stacking_random_state": int(_int_value(payload.get("stacking_random_state"), 42)),
+        "stacking_verbose": bool(payload.get("stacking_verbose", False)),
+    }
 
 
 def _csv_upload_openapi_example(summary: str) -> dict[str, Any]:
@@ -542,6 +744,17 @@ def create_app(
     app.state.artifact_sha256 = artifact_metadata.get("artifact_sha256")
     app.state.model_path = str(resolved_model_path)
     app.state.auth_token_enabled = auth_token is not None
+    app.state.latest_model_config = _normalize_model_config(
+        {
+            "stacking_meta_model_type": getattr(pipeline, "stacking_meta_model_type", "mlp"),
+            "stacking_hidden_layer_sizes": getattr(pipeline, "stacking_hidden_layer_sizes", (32, 16)),
+            "stacking_alpha": getattr(pipeline, "stacking_alpha", 1e-4),
+            "stacking_learning_rate_init": getattr(pipeline, "stacking_learning_rate_init", 1e-3),
+            "stacking_max_iter": getattr(pipeline, "stacking_max_iter", 500),
+            "stacking_random_state": getattr(pipeline, "stacking_random_state", 42),
+            "stacking_verbose": getattr(pipeline, "stacking_verbose", False),
+        }
+    )
     default_feedback_store = resolved_model_path.with_name("feedback_ledger.jsonl")
     app.state.feedback_store_path = str(Path(feedback_store) if feedback_store is not None else default_feedback_store)
 
@@ -563,6 +776,23 @@ def create_app(
     def dashboard_data() -> dict[str, Any]:
         return _build_dashboard_data(app)
 
+    @app.get("/api/model-config", dependencies=[Depends(auth_dependency)])
+    def get_model_config() -> dict[str, Any]:
+        return {
+            "model_info": _model_metadata(app),
+            "config": getattr(app.state, "latest_model_config", None),
+        }
+
+    @app.post("/api/model-config", dependencies=[Depends(auth_dependency)])
+    def set_model_config(payload: dict[str, Any]) -> dict[str, Any]:
+        normalized = _normalize_model_config(payload)
+        app.state.latest_model_config = normalized
+        return {
+            "model_info": _model_metadata(app),
+            "config": normalized,
+            "message": "Model configuration saved for the current backend session.",
+        }
+
     @app.get("/feedback", dependencies=[Depends(auth_dependency)])
     def feedback_overview() -> dict[str, Any]:
         store_path = Path(app.state.feedback_store_path)
@@ -579,17 +809,23 @@ def create_app(
         return {
             "input": jsonable_encoder(patient),
             "prediction": record,
+            "model_config": getattr(app.state, "latest_model_config", None),
             "model_info": {
                 "model_name": app.state.model_name,
                 "model_version": app.state.model_version,
                 "model_type": type(app.state.pipeline.named_steps["model"]).__name__,
             },
+            "conformal_p_value": record.get("conformal_p_value"),
+            "conformal_assessment": record.get("conformal_assessment"),
             "anomaly_score": record.get("anomaly_score"),
             "risk_score": record.get("risk_score"),
             "risk_category": record.get("risk_category", record.get("risk_level")),
             "risk_level": record.get("risk_level"),
             "alert_triggered": record.get("alert_triggered"),
             "is_anomaly": record.get("is_anomaly"),
+            "explanation": _compute_feature_explanation(app.state.pipeline, patient, top_k=10),
+            "latent_manifold": _compute_latent_manifold(app.state.pipeline, patient),
+            "reconstruction_residual_heatmap": _compute_reconstruction_residual_heatmap(app.state.pipeline, patient),
             "feature_engineering": _compute_feature_engineering(app.state.pipeline, patient, top_k=25),
             "data_scaling": _compute_data_scaling(app.state.pipeline, patient, top_k=25),
             "data_encoding": _compute_data_encoding(app.state.pipeline, patient, top_k=25),
@@ -626,12 +862,17 @@ def create_app(
         return {
             "input": jsonable_encoder(patient),
             "prediction": record,
+            "model_config": getattr(app.state, "latest_model_config", None),
             "model_info": {
                 "model_name": app.state.model_name,
                 "model_version": app.state.model_version,
                 "model_type": type(app.state.pipeline.named_steps["model"]).__name__,
             },
+            "conformal_p_value": record.get("conformal_p_value"),
+            "conformal_assessment": record.get("conformal_assessment"),
             "explanation": explanation,
+            "latent_manifold": _compute_latent_manifold(app.state.pipeline, patient),
+            "reconstruction_residual_heatmap": _compute_reconstruction_residual_heatmap(app.state.pipeline, patient),
             "feature_engineering": feature_engineering,
             "data_scaling": data_scaling,
             "data_encoding": data_encoding,

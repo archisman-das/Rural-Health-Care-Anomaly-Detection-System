@@ -159,7 +159,15 @@ def evaluate_score_columns(
     if not isinstance(scores, pd.DataFrame):
         raise TypeError("scores must be a pandas DataFrame.")
 
-    columns = score_columns or list(scores.columns)
+    if score_columns is not None:
+        columns = list(score_columns)
+    else:
+        filtered_columns = [
+            column
+            for column in scores.columns
+            if column.endswith("_anomaly_score") or column == "anomaly_score" or column == "distribution_mmd_score"
+        ]
+        columns = filtered_columns or list(scores.columns)
     rows: list[dict[str, float | str]] = []
     for column in columns:
         if column not in scores.columns:
@@ -256,6 +264,34 @@ def summarize_runtime_metrics(scores: pd.DataFrame) -> dict[str, Any]:
     return summary
 
 
+def summarize_conformal_metrics(scores: pd.DataFrame, *, alpha: float = 0.05) -> dict[str, Any]:
+    """Summarize conformal p-values when available."""
+
+    if "conformal_p_value" not in scores.columns:
+        return {}
+
+    p_values = pd.to_numeric(scores["conformal_p_value"], errors="coerce").to_numpy(dtype=float)
+    p_values = p_values[np.isfinite(p_values)]
+    if p_values.size == 0:
+        return {
+            "alpha": float(alpha),
+            "count": 0,
+            "available": False,
+        }
+
+    verdict_rate = float(np.mean(p_values <= alpha))
+    return {
+        "alpha": float(alpha),
+        "count": int(p_values.size),
+        "available": True,
+        "p_value_min": float(np.min(p_values)),
+        "p_value_mean": float(np.mean(p_values)),
+        "p_value_median": float(np.median(p_values)),
+        "p_value_p95": float(np.percentile(p_values, 95)),
+        "anomalous_rate_at_alpha": verdict_rate,
+    }
+
+
 def _build_high_disagreement_rows(
     scores: pd.DataFrame,
     agreement_columns: list[str],
@@ -348,7 +384,11 @@ def build_unsupervised_analysis(
     if not isinstance(scores, pd.DataFrame):
         raise TypeError("scores must be a pandas DataFrame.")
 
-    score_columns = score_columns or [column for column in scores.columns if column.endswith("_anomaly_score") or column == "anomaly_score"]
+    score_columns = score_columns or [
+        column
+        for column in scores.columns
+        if column.endswith("_anomaly_score") or column == "anomaly_score" or column == "distribution_mmd_score"
+    ]
     score_columns = [column for column in score_columns if column in scores.columns]
 
     distribution_columns = [
@@ -366,21 +406,26 @@ def build_unsupervised_analysis(
         if "reconstruction_error" in column:
             reconstruction_error_histograms.append({"column": column, **_histogram_summary(scores[column], bins=histogram_bins)})
 
-    agreement_columns = [
-        column
-        for column in (
-            "isolation_forest_anomaly_score",
-            "one_class_svm_anomaly_score",
-            "local_outlier_factor_anomaly_score",
-            "autoencoder_anomaly_score",
-            "anomaly_transformer_anomaly_score",
-            "variational_autoencoder_anomaly_score",
-            "ganomaly_anomaly_score",
-            "cnn_autoencoder_anomaly_score",
-            "deep_svdd_anomaly_score",
-        )
-        if column in scores.columns
+    preferred_agreement_columns = [
+        "point_anomaly_score",
+        "contextual_anomaly_score",
+        "collective_anomaly_score",
+        "isolation_forest_anomaly_score",
+        "one_class_svm_anomaly_score",
+        "local_outlier_factor_anomaly_score",
+        "autoencoder_anomaly_score",
+        "anomaly_transformer_anomaly_score",
+        "variational_autoencoder_anomaly_score",
+        "ganomaly_anomaly_score",
+        "cnn_autoencoder_anomaly_score",
+        "deep_svdd_anomaly_score",
     ]
+    agreement_columns = [column for column in preferred_agreement_columns if column in scores.columns]
+    agreement_columns.extend(
+        column
+        for column in scores.columns
+        if column.endswith("_anomaly_score") and column not in agreement_columns and column != "anomaly_score"
+    )
     agreement: dict[str, Any] | None = None
     high_disagreement_rows: list[dict[str, Any]] = []
     if len(agreement_columns) >= 2:
@@ -466,6 +511,11 @@ def _html_report_table(df: pd.DataFrame) -> str:
 
 def _friendly_model_name(model_name: str) -> str:
     mapping = {
+        "point_anomaly_score": "Point Anomaly",
+        "contextual_anomaly_score": "Contextual Anomaly",
+        "collective_anomaly_score": "Collective Anomaly",
+        "distribution_mmd_score": "Distribution MMD",
+        "distribution_staleness_alarm": "Staleness Alarm",
         "isolation_forest_anomaly_score": "Isolation Forest",
         "one_class_svm_anomaly_score": "One-Class SVM",
         "local_outlier_factor_anomaly_score": "Local Outlier Factor",
@@ -475,6 +525,10 @@ def _friendly_model_name(model_name: str) -> str:
         "ganomaly_anomaly_score": "GANomaly",
         "cnn_autoencoder_anomaly_score": "CNN Autoencoder",
         "deep_svdd_anomaly_score": "Deep SVDD",
+        "sequence_anomaly_score": "Temporal Sequence Detector",
+        "score_stream_drift_alarm": "Score Stream Drift Alarm",
+        "score_stream_cusum_alarm": "CUSUM Drift Alarm",
+        "score_stream_adwin_alarm": "ADWIN Drift Alarm",
         "anomaly_score": "Ensemble",
     }
     return mapping.get(model_name, model_name.replace("_", " ").title())
@@ -536,6 +590,7 @@ def build_evaluation_report(
         threshold=threshold,
     )
     runtime = summarize_runtime_metrics(scores)
+    conformal = summarize_conformal_metrics(scores, alpha=0.05)
     comparison = evaluate_score_columns(
         scores,
         y_true=y_true,
@@ -552,6 +607,10 @@ def build_evaluation_report(
     model_comparison = _model_comparison_matrix(
         comparison,
         model_order=[
+            "point_anomaly_score",
+            "contextual_anomaly_score",
+            "collective_anomaly_score",
+            "distribution_mmd_score",
             "isolation_forest_anomaly_score",
             "one_class_svm_anomaly_score",
             "local_outlier_factor_anomaly_score",
@@ -592,6 +651,21 @@ def build_evaluation_report(
         summary_lines.append(f"- Best model: {best_model}")
     if "anomaly_score" in scores.columns:
         summary_lines.append("- Ensemble score: anomaly_score")
+    conformal_mean_label = "n/a"
+    conformal_anomalous_rate_label = "n/a"
+    conformal_verdict_label = "calibrated"
+    if conformal.get("available"):
+        conformal_mean_label = f"{conformal.get('p_value_mean', float('nan')):.4f}"
+        conformal_anomalous_rate_label = f"{conformal.get('anomalous_rate_at_alpha', float('nan')):.4f}"
+        conformal_verdict_label = "anomalous" if float(conformal.get("anomalous_rate_at_alpha", 0.0)) > 0 else "calibrated"
+    if conformal:
+        summary_lines.extend(
+            [
+                f"- Conformal alpha: {conformal['alpha']}",
+                f"- Conformal p-value mean: {conformal_mean_label}",
+                f"- Conformal anomalous rate at alpha: {conformal_anomalous_rate_label}",
+            ]
+        )
 
     if executive_summary:
         return {
@@ -633,6 +707,18 @@ def build_evaluation_report(
                         if "anomaly_score" in scores.columns
                         else []
                     ),
+                    *(
+                        [
+                            "  <div class=\"card\">",
+                            f"    <strong>Conformal verdict:</strong> {html.escape(conformal_verdict_label)}",
+                            f"    <div>alpha = {html.escape(str(conformal.get('alpha', 0.05)))}</div>",
+                            f"    <div>p-value mean = {html.escape(conformal_mean_label)}</div>",
+                            f"    <div>anomalous rate = {html.escape(conformal_anomalous_rate_label)}</div>",
+                            "  </div>",
+                        ]
+                        if conformal
+                        else []
+                    ),
                     "  <h2>Model Comparison</h2>",
                     f"  {_html_report_table(model_comparison.reset_index()) if not model_comparison.empty else '<p>(no rows)</p>'}",
                     "</body>",
@@ -646,6 +732,7 @@ def build_evaluation_report(
             "model_comparison_records": model_comparison.reset_index().to_dict(orient="records") if not model_comparison.empty else [],
             "unsupervised_analysis": unsupervised,
             "runtime_metrics": runtime,
+            "conformal_metrics": conformal,
         }
 
     summary_lines.extend(
@@ -792,6 +879,18 @@ def build_evaluation_report(
                         *(
                             [f"  <div class=\"card\"><strong>Ensemble score:</strong> anomaly_score</div>"]
                             if "anomaly_score" in scores.columns
+                            else []
+                        ),
+                        *(
+                            [
+                                "  <div class=\"card\">",
+                                f"    <strong>Conformal verdict:</strong> {html.escape(conformal_verdict_label)}",
+                                f"    <div>alpha = {html.escape(str(conformal.get('alpha', 0.05)))}</div>",
+                                f"    <div>p-value mean = {html.escape(conformal_mean_label)}</div>",
+                                f"    <div>anomalous rate = {html.escape(conformal_anomalous_rate_label)}</div>",
+                                "  </div>",
+                            ]
+                            if conformal
                             else []
                         ),
                     ]

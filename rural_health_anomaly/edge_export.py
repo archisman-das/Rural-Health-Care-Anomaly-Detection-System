@@ -480,6 +480,20 @@ def export_edge_bundle(pipeline: Any, output_dir: str | Path, *, opset: int = 13
         manifest["artifacts"]["deep_svdd"]["raw_score_mean"] = float(getattr(deep_svdd, "_training_raw_score_mean_", float("nan")))
         manifest["artifacts"]["deep_svdd"]["raw_score_std"] = float(getattr(deep_svdd, "_training_raw_score_std_", float("nan")))
 
+    if hasattr(model, "sequence_detector_") and getattr(model, "sequence_detector_", None) is not None:
+        sequence_detector = model.sequence_detector_
+        sequence_detector_path = output_path / "sequence_detector.joblib"
+        joblib.dump(sequence_detector, sequence_detector_path)
+        exported_files["sequence_detector_joblib"] = str(sequence_detector_path)
+        manifest["artifacts"]["sequence_detector"] = {
+            "joblib": sequence_detector_path.name,
+            "window_size": int(getattr(sequence_detector, "sequence_window_size_", getattr(sequence_detector, "window_size", 1))),
+            "training_window_count": int(getattr(sequence_detector, "training_window_count_", 0)),
+            "training_row_count": int(getattr(sequence_detector, "training_row_count_", 0)),
+            "raw_score_mean": float(getattr(sequence_detector, "_training_raw_score_mean_", float("nan"))),
+            "raw_score_std": float(getattr(sequence_detector, "_training_raw_score_std_", float("nan"))),
+        }
+
     if "isolation_forest" in model.estimators_:
         isolation_model = model.estimators_["isolation_forest"]
         manifest["artifacts"]["isolation_forest"]["raw_score_mean"] = float(getattr(isolation_model, "_training_raw_score_mean_", float("nan")))

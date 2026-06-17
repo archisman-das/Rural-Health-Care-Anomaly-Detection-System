@@ -4,6 +4,7 @@ from .config import PreprocessingConfig
 from .autoencoder import DeepAutoencoder
 from .cnn_autoencoder import CNNAutoencoder
 from .anomaly_transformer import AnomalyTransformer
+from .temporal_sequence_detector import TemporalConvolutionalSequenceDetector
 from .ganomaly import GANomaly
 from .variational_autoencoder import VariationalAutoencoder
 from .deep_svdd import DeepSVDD
@@ -29,6 +30,7 @@ __all__ = [
     "DeepAutoencoder",
     "CNNAutoencoder",
     "AnomalyTransformer",
+    "TemporalConvolutionalSequenceDetector",
     "GANomaly",
     "VariationalAutoencoder",
     "DeepSVDD",

@@ -384,10 +384,11 @@ It also highlights the rows where detectors disagree most, which is useful for m
 
 The web dashboard surfaces several explanation-oriented views that are derived from the model outputs:
 
-- A latent manifold projection from the VAE encoder
-- A highlighted current test record in that 2D projection
-- A reconstruction residual heatmap for reconstruction-based models
-- Compact score and anomaly distribution views in the patient-care screen
+| View | What it shows | Current dashboard behavior |
+| --- | --- | --- |
+| Latent manifold | A 2D projection of the VAE latent space with the Deep SVDD boundary. | The current record stays highlighted, the chart uses a compact frame, and the projection remains visible across screen sizes. |
+| Residuals | Per-feature reconstruction errors for the selected record. | The summary copy, selected-cell detail, and model ranking are stacked so the card does not overflow on mobile or desktop. |
+| Patient-care summaries | Compact score and anomaly distribution views. | The cards are tuned to stay small and readable in the clinical flow. |
 
 These views are not separate detectors by themselves. They are presentation layers for the latent space and residual structure already produced by the models.
 

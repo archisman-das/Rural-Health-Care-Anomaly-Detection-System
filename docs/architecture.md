@@ -226,7 +226,7 @@ It exists to document:
 
 ### Stage 7: Model Analytical Hub
 
-This stage is the final internal review hub.
+This stage is the final visible review hub in the dashboard.
 
 It can surface:
 
@@ -246,7 +246,7 @@ The normal request flow is:
 4. The detector stack scores the record.
 5. Fusion logic combines the detector outputs.
 6. Explanation helpers generate summaries and visuals.
-7. The dashboard renders the result in the relevant step.
+7. The dashboard renders the result in the relevant visible step, including the model analytical hub.
 
 This flow is the same whether the input comes from a manual form or from a parsed lab report.
 

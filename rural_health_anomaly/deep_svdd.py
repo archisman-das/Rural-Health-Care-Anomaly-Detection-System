@@ -490,6 +490,15 @@ class DeepSVDD(BaseEstimator, OutlierMixin):
         X = np.asarray(X, dtype=float)
         return self._latent_distances(X)
 
+    def latent_embedding(self, X: Any) -> np.ndarray:
+        """Return the latent representation used by the hypersphere head."""
+
+        if not getattr(self, "fitted_", False):
+            raise RuntimeError("DeepSVDD must be fit before scoring.")
+        X = np.asarray(X, dtype=float)
+        latent, _ = self._forward(X)
+        return latent
+
     def raw_score(self, X: Any) -> np.ndarray:
         return self.latent_distance(X)
 

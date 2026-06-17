@@ -17,10 +17,23 @@
 
 ## Quick Notes
 
-- Use the README for installation and CLI usage.
-- Use the project documentation for the full system overview and workflow details.
-- Use the model details documentation for algorithm-by-algorithm behavior, conformal scoring, and dashboard explanation views.
-- Use the reference papers page for the research background behind the algorithm families.
-- Use the provenance docs to inspect how schema fields become model features.
-- Use the schema docs to understand the normalized database layout and preprocessing flow.
-- Start from `risk_scoring_config.example.json` when tuning the blended risk score.
+| Topic | Best starting point |
+| --- | --- |
+| Installation and CLI usage | `README.md` |
+| Full workflow and dashboard steps | `project_documentation.md` |
+| Algorithm behavior and explanation views | `model_details.md` |
+| Research background | `reference.md` |
+| Feature provenance | `feature_provenance.md` |
+| Schema and preprocessing layout | `../normalized_healthcare_schema.md` |
+| Risk scoring tuning | `risk_scoring_config.example.json` |
+
+The current dashboard flow is centered on six visible steps:
+
+1. Patient Details
+2. Lab Investigation
+3. Patient Care Insights
+4. Comparative Analysis
+5. Decision Support
+6. Model Analytical Hub
+
+The backend processing layer is still part of the architecture, but it is no longer presented as a separate visible dashboard step.

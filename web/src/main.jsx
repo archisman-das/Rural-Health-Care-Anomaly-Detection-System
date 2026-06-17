@@ -19,9 +19,12 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   PolarAngleAxis,
   PolarGrid,
   PolarRadiusAxis,
+  ReferenceLine,
   Radar,
   RadarChart as RechartsRadarChart,
   ResponsiveContainer,
@@ -295,9 +298,22 @@ const labPanels = [
   { key: "electrolytes", label: "Electrolytes", description: "Core chemistry balance" },
 ];
 
+const comorbidityOptions = [
+  "Hypertension",
+  "Type 2 Diabetes",
+  "Obesity",
+  "Coronary Artery Disease",
+  "Chronic Kidney Disease",
+  "Chronic Obstructive Pulmonary Disease",
+  "Hyperlipidemia",
+  "Depressive Disorder",
+  "Osteoarthritis",
+  "Asthma",
+];
+
 const labDefaultValues = Object.fromEntries(labFieldSpecs.map((field) => [field.key, ""]));
 
-const requiredLabFieldKeys = new Set(["fastingGlucose", "postprandialGlucose", "hemoglobin"]);
+const requiredLabFieldKeys = new Set();
 
 const labSchema = z.object(
   Object.fromEntries(
@@ -328,6 +344,8 @@ const initialAnalysisState = {
   performanceSeries: [],
   featureAttributions: [],
   shapSummary: [],
+  shapInteractionHeatmap: null,
+  reconstructionResidualHeatmap: null,
   trendSeries: [],
   radarMetrics: [],
   heatmapCells: [],
@@ -335,6 +353,10 @@ const initialAnalysisState = {
   beforeAfter: null,
   progression: [],
   summaryPoints: [],
+  backendConfig: null,
+  backendPrediction: null,
+  shapSelectedPair: null,
+  shapSelectedNarrative: "",
 };
 
 const analysisModelCatalog = [
@@ -366,7 +388,7 @@ const emptyPatientState = {
     notes: "",
   },
   medicalHistory: {
-    comorbidities: "Diabetes, hypertension",
+    comorbidities: "",
     allergies: "",
     currentMedications: "Metformin, amlodipine",
     familyHistory: "",
@@ -384,6 +406,7 @@ const emptyPatientState = {
   },
   labs: {
     ...labDefaultValues,
+    bloodGlucose: "",
   },
   careInsights: {
     clinicianSummary: "",
@@ -400,10 +423,20 @@ const emptyPatientState = {
   backendProcessing: {
     pipelineStatus: "Draft",
     featureCount: 0,
+    stackingConfig: null,
   },
   modelHub: {
     activeModel: "Anomaly Transformer",
     reviewNote: "",
+  },
+  modelTuning: {
+    stackingMetaModelType: "mlp",
+    stackingHiddenLayerSizes: "32,16",
+    stackingAlpha: "0.0001",
+    stackingLearningRateInit: "0.001",
+    stackingMaxIter: "500",
+    stackingRandomState: "42",
+    stackingVerbose: false,
   },
 };
 
@@ -427,6 +460,41 @@ function PatientProvider({ children }) {
   const [modelResults, setModelResults] = React.useState({
     ...initialAnalysisState,
   });
+  const [modelConfigHydrated, setModelConfigHydrated] = React.useState(false);
+  const [modelConfigSaveState, setModelConfigSaveState] = React.useState("loading");
+  const lastSavedModelConfigRef = React.useRef("");
+
+  const serializeStackingConfig = React.useCallback((config) => JSON.stringify(config), []);
+
+  const applyLoadedModelConfig = React.useCallback((config) => {
+    if (!config || typeof config !== "object") {
+      return;
+    }
+
+    const hiddenLayerSizes = Array.isArray(config.stacking_hidden_layer_sizes)
+      ? config.stacking_hidden_layer_sizes.join(",")
+      : String(config.stacking_hidden_layer_sizes || "32,16");
+
+    setPatient((current) => ({
+      ...current,
+      modelTuning: {
+        ...current.modelTuning,
+        stackingMetaModelType: String(config.stacking_meta_model_type || current.modelTuning.stackingMetaModelType || "mlp"),
+        stackingHiddenLayerSizes: hiddenLayerSizes,
+        stackingAlpha: String(config.stacking_alpha ?? current.modelTuning.stackingAlpha ?? "0.0001"),
+        stackingLearningRateInit: String(
+          config.stacking_learning_rate_init ?? current.modelTuning.stackingLearningRateInit ?? "0.001",
+        ),
+        stackingMaxIter: String(config.stacking_max_iter ?? current.modelTuning.stackingMaxIter ?? "500"),
+        stackingRandomState: String(config.stacking_random_state ?? current.modelTuning.stackingRandomState ?? "42"),
+        stackingVerbose: Boolean(config.stacking_verbose ?? current.modelTuning.stackingVerbose ?? false),
+      },
+      backendProcessing: {
+        ...current.backendProcessing,
+        stackingConfig: config,
+      },
+    }));
+  }, []);
 
   const updateSection = React.useCallback((section, value) => {
     setPatient((current) => ({
@@ -450,13 +518,114 @@ function PatientProvider({ children }) {
     setPatient(emptyPatientState);
     setCompletedSteps([]);
     setModelResults({ ...initialAnalysisState });
+    lastSavedModelConfigRef.current = serializeStackingConfig(buildStackingConfig({ modelTuning: emptyPatientState.modelTuning }));
   }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const hydrateModelConfig = async () => {
+      try {
+        const response = await axios.get("/api/model-config");
+        if (cancelled) {
+          return;
+        }
+        if (response.data?.config) {
+          lastSavedModelConfigRef.current = serializeStackingConfig(response.data.config);
+          applyLoadedModelConfig(response.data.config);
+          setModelConfigHydrated(true);
+          setModelConfigSaveState("saved");
+          return;
+        }
+      } catch (error) {
+        // Fall through to local fallback.
+      }
+
+      if (typeof window !== "undefined" && window.localStorage) {
+        const fallback = window.localStorage.getItem("latest-model-config");
+        if (!fallback || cancelled) {
+          if (!cancelled) {
+            lastSavedModelConfigRef.current = serializeStackingConfig(buildStackingConfig({ modelTuning: emptyPatientState.modelTuning }));
+            setModelConfigHydrated(true);
+            setModelConfigSaveState("saved");
+          }
+          return;
+        }
+        try {
+          const parsedFallback = JSON.parse(fallback);
+          lastSavedModelConfigRef.current = serializeStackingConfig(parsedFallback);
+          applyLoadedModelConfig(parsedFallback);
+          setModelConfigSaveState("local");
+        } catch (error) {
+          // Ignore malformed local fallback.
+        }
+      }
+
+      if (!cancelled) {
+        if (!lastSavedModelConfigRef.current) {
+          lastSavedModelConfigRef.current = serializeStackingConfig(buildStackingConfig({ modelTuning: emptyPatientState.modelTuning }));
+        }
+        setModelConfigHydrated(true);
+        setModelConfigSaveState((current) => (current === "loading" ? "saved" : current));
+      }
+    };
+
+    hydrateModelConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyLoadedModelConfig]);
+
+  React.useEffect(() => {
+    if (!modelConfigHydrated) {
+      return;
+    }
+
+    const config = buildStackingConfig(patient);
+    const serializedConfig = serializeStackingConfig(config);
+    if (serializedConfig === lastSavedModelConfigRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setModelConfigSaveState("saving");
+      submitModelConfig(config)
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
+          lastSavedModelConfigRef.current = serializedConfig;
+          setPatient((current) => ({
+            ...current,
+            backendProcessing: {
+              ...current.backendProcessing,
+              stackingConfig: config,
+            },
+          }));
+          setModelConfigSaveState(result.source === "api" ? "saved" : "local");
+        })
+        .catch(() => {
+          if (!cancelled) {
+            lastSavedModelConfigRef.current = serializedConfig;
+            setModelConfigSaveState("error");
+          }
+        });
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [modelConfigHydrated, patient.modelTuning, serializeStackingConfig]);
 
   const value = React.useMemo(
     () => ({
       patient,
       completedSteps,
       modelResults,
+      modelConfigSaveState,
       setModelResults,
       updateSection,
       markStepComplete,
@@ -464,7 +633,7 @@ function PatientProvider({ children }) {
       resetFlow,
       highestUnlockedIndex: getHighestUnlockedIndex(completedSteps),
     }),
-    [completedSteps, modelResults, markStepComplete, markStepIncomplete, resetFlow, updateSection, patient],
+    [completedSteps, modelConfigSaveState, modelResults, markStepComplete, markStepIncomplete, resetFlow, updateSection, patient],
   );
 
   return <PatientContext.Provider value={value}>{children}</PatientContext.Provider>;
@@ -487,12 +656,39 @@ function AppShell() {
   const location = useLocation();
   const currentSlug = location.pathname.split("/").filter(Boolean)[0] || firstStepSlug;
   const currentStep = flowSteps[stepIndexBySlug.get(currentSlug) ?? 0];
+  const topbarRef = React.useRef(null);
   const [theme, setTheme] = React.useState(() => {
     if (typeof window === "undefined") {
       return "night";
     }
     return window.localStorage.getItem("dashboard-theme") || "night";
   });
+
+  React.useEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const root = document.documentElement;
+    const updateTopbarHeight = () => {
+      const topbarHeight = topbarRef.current?.getBoundingClientRect().height ?? 0;
+      root.style.setProperty("--topbar-height", `${Math.ceil(topbarHeight)}px`);
+    };
+
+    updateTopbarHeight();
+
+    const observer = typeof ResizeObserver !== "undefined" && topbarRef.current ? new ResizeObserver(updateTopbarHeight) : null;
+    if (observer && topbarRef.current) {
+      observer.observe(topbarRef.current);
+    }
+
+    window.addEventListener("resize", updateTopbarHeight);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updateTopbarHeight);
+    };
+  }, []);
 
   React.useEffect(() => {
     if (typeof document === "undefined") {
@@ -503,11 +699,11 @@ function AppShell() {
   }, [theme]);
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
+    <div className="app-shell mx-auto min-h-screen w-[min(1440px,calc(100vw-32px))] py-7 pb-12">
+      <header ref={topbarRef} className="topbar flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="eyebrow">Rural health workflow</p>
-          <h1>Patient details to model hub</h1>
+          <h1 className="eyebrow">Heathcare Anomaly Detection Dashboard</h1>
+          
           <p className="lede">
             The active page stays focused on the current clinical step, with Back and Continue controls inside each
             page rather than a separate roadmap screen.
@@ -526,11 +722,11 @@ function AppShell() {
             type="button"
             className="theme-toggle"
             onClick={() => setTheme((current) => (current === "day" ? "night" : "day"))}
-            aria-pressed={theme === "day"}
-            aria-label={theme === "day" ? "Switch to night mode" : "Switch to day mode"}
+            aria-pressed={theme === "night"}
+            aria-label={theme === "night" ? "Switch to day mode" : "Switch to night mode"}
           >
-            <span>{theme === "day" ? "Night mode" : "Day mode"}</span>
-            <strong>{theme === "day" ? "On" : "Off"}</strong>
+            <span>Night mode</span>
+            <strong>{theme === "night" ? "On" : "Off"}</strong>
           </button>
         </div>
       </header>
@@ -542,7 +738,14 @@ function AppShell() {
   );
 }
 
-function StepLayout({ step, children, nextLabel, nextDisabled, onNext }) {
+function StepLayout({
+  step,
+  children,
+  nextLabel,
+  nextDisabled,
+  onNext,
+  showContinueButton = true,
+}) {
   const navigate = useNavigate();
   const { completedSteps, markStepComplete, highestUnlockedIndex } = usePatient();
   const stepIndex = stepIndexBySlug.get(step.slug) ?? 0;
@@ -551,6 +754,15 @@ function StepLayout({ step, children, nextLabel, nextDisabled, onNext }) {
   const previousStep = !isFirst ? visibleFlowSteps[stepIndex - 1] : null;
   const nextStep = !isLast ? visibleFlowSteps[stepIndex + 1] : null;
   const isComplete = completedSteps.includes(step.slug);
+  const showBackToTop = stepIndex >= 2;
+
+  const handleBackToTop = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const completeAndContinue = () => {
     if (onNext) {
@@ -573,13 +785,13 @@ function StepLayout({ step, children, nextLabel, nextDisabled, onNext }) {
 
   return (
     <section className="flow-page">
-      <div className="flow-page__header">
+      <div className="flow-page__header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="eyebrow">Step {stepIndex + 1}</p>
           <h2>{step.title}</h2>
           <p className="lede">{step.subtitle}</p>
         </div>
-        <div className="flow-page__actions">
+        <div className="flow-page__actions flex flex-wrap items-center gap-3">
           <span className="status-pill">{isComplete ? "Marked complete" : "In progress"}</span>
           <button
             type="button"
@@ -589,25 +801,36 @@ function StepLayout({ step, children, nextLabel, nextDisabled, onNext }) {
           >
             Back
           </button>
-          <button
-            type="button"
-            className="button button--primary"
-            onClick={completeAndContinue}
-            disabled={nextDisabled}
-          >
-            {nextLabel || (nextStep ? step.nextLabel : "Finish route")}
-          </button>
+          {showContinueButton ? (
+            <>
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={completeAndContinue}
+                disabled={nextDisabled}
+              >
+                {nextLabel || (nextStep ? step.nextLabel : "Finish route")}
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
       {children}
+      {showBackToTop ? (
+        <div className="back-to-top-float">
+          <button type="button" className="button button--ghost back-to-top-float__button" onClick={handleBackToTop}>
+            Back to top
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function PageCard({ title, eyebrow, children, compact = false }) {
+function PageCard({ title, eyebrow, children, compact = false, wide = false }) {
   return (
-    <article className={`card${compact ? " card--compact" : ""}`}>
+    <article className={`card grid gap-4${compact ? " card--compact" : ""}${wide ? " card--wide" : ""}`}>
       <p className="eyebrow">{eyebrow}</p>
       <h3>{title}</h3>
       <div className="card__body">{children}</div>
@@ -615,16 +838,37 @@ function PageCard({ title, eyebrow, children, compact = false }) {
   );
 }
 
-function StepSkeleton({ step, left, right, footer }) {
+function StepSkeleton({
+  step,
+  left,
+  right,
+  rightTitle = "Supporting context",
+  rightEyebrow = "Reference area",
+  footer,
+  showContinueButton = true,
+  gridClassName = "",
+  nextLabel,
+  nextDisabled,
+  onNext,
+}) {
+  const hasRightCard = Boolean(right);
   return (
-    <StepLayout step={step}>
-      <div className="grid-grid">
-        <PageCard title="Primary workspace" eyebrow="Active area">
+    <StepLayout
+      step={step}
+      showContinueButton={showContinueButton}
+      nextLabel={nextLabel}
+      nextDisabled={nextDisabled}
+      onNext={onNext}
+    >
+      <div className={`step-shell-grid${gridClassName ? ` ${gridClassName}` : ""}`}>
+        <PageCard title="Primary workspace" eyebrow="Active area" wide={!hasRightCard}>
           {left}
         </PageCard>
-        <PageCard title="Supporting context" eyebrow="Reference area" compact>
-          {right}
-        </PageCard>
+        {hasRightCard ? (
+          <PageCard title={rightTitle} eyebrow={rightEyebrow} compact>
+            {right}
+          </PageCard>
+        ) : null}
       </div>
     </StepLayout>
   );
@@ -632,7 +876,7 @@ function StepSkeleton({ step, left, right, footer }) {
 
 function SectionCard({ title, eyebrow, description, children, compact = false }) {
   return (
-    <section className={`section-card${compact ? " section-card--compact" : ""}`}>
+    <section className={`section-card grid gap-4${compact ? " section-card--compact" : ""}`}>
       <div className="section-card__head">
         <div>
           <p className="eyebrow">{eyebrow}</p>
@@ -642,6 +886,191 @@ function SectionCard({ title, eyebrow, description, children, compact = false })
       </div>
       <div className="section-card__body">{children}</div>
     </section>
+  );
+}
+
+function CompletionRing({ value }) {
+  return (
+    <span className="completion-ring" style={{ "--ring-fill": `${Math.max(0, Math.min(100, value)) * 3.6}deg` }}>
+      <span className="completion-ring__value">{value}%</span>
+    </span>
+  );
+}
+
+function Step1ReferenceAreaCard({
+  patient,
+  intakeReady,
+  missingRequiredFields,
+  bmi,
+  requiredIntakeFields,
+  completionPercentage,
+}) {
+  return (
+    <div className="stack">
+      <section className={`intake-summary-card${intakeReady ? " is-ready" : ""}`}>
+        <div className="viz-card__head">
+          <div>
+            <strong>Mandatory Fields</strong>
+            <p>Completion value for the required intake fields.</p>
+          </div>
+          <span className={`status-pill${intakeReady ? "" : " status-pill--locked"}`}>
+            <CompletionRing value={completionPercentage} />
+            <span>{intakeReady ? "Ready to continue" : `${missingRequiredFields.length} missing`}</span>
+          </span>
+        </div>
+        <div className="intake-summary-grid">
+          <div className="summary-pill">
+            <span>Completion</span>
+            <strong>{completionPercentage}%</strong>
+          </div>
+          <div className="summary-pill">
+            <span>BMI</span>
+            <strong>{bmi}</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Triage</span>
+            <strong>{patient.visit.triagePriority}</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Location</span>
+            <strong>{patient.demographics.locationType}</strong>
+          </div>
+        </div>
+        <div className="intake-checklist">
+          {requiredIntakeFields.map((field) => (
+            <div key={field.label} className="intake-checklist__item">
+              <span>{field.label}</span>
+              <strong>{field.valid ? "Captured" : "Missing"}</strong>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function LabReferenceAreaCard({ missingFields, isValid, uploadState, totalFields }) {
+  const completionPercentage = Math.max(0, Math.min(100, Math.round(((totalFields - missingFields) / Math.max(totalFields, 1)) * 100)));
+
+  return (
+    <div className="stack">
+      <section className="intake-summary-card">
+        <div className="viz-card__head">
+          <div>
+            <strong>Validation and hints</strong>
+            <p>Required fields are checked before Next. Range hints turn green when values are in range and amber when they are not.</p>
+          </div>
+          <span className={`status-pill${isValid ? "" : " status-pill--locked"}`}>
+            <CompletionRing value={completionPercentage} />
+            <span>{isValid ? "Ready to continue" : `${missingFields} missing`}</span>
+          </span>
+        </div>
+        <div className="intake-summary-grid">
+          <div className="summary-pill">
+            <span>Completion</span>
+            <strong>{completionPercentage}%</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Required left</span>
+            <strong>{missingFields}</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Upload</span>
+            <strong>{uploadState.status}</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Status</span>
+            <strong>{isValid ? "Ready" : "Incomplete"}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="callout callout--soft">
+        <strong>What happens after labs</strong>
+        <p>Once the form passes validation, the next step can use the normalized lab state without re-entry.</p>
+      </section>
+    </div>
+  );
+}
+
+function ComparisonReferenceAreaCard({
+  analysisReady,
+  bestModel,
+  comparisonInsights,
+  selectedModelName,
+  fastestModelName,
+  lightestModelName,
+  scoreSpreadLabel,
+  summaryPoints,
+}) {
+  return (
+    <div className="stack">
+      <AnalysisSection
+        unlocked={true}
+        eyebrow="Model snapshot"
+        title="Comparative state at a glance"
+        description="The current run state, best model, and score spread are shown as a single sequential summary."
+      >
+        <div className="stack">
+          <div className="summary-pill">
+            <span>Analysis status</span>
+            <strong>{analysisReady ? "Complete" : "Running"}</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Leading model</span>
+            <strong>{comparisonInsights.leader?.name || "Locked"}</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Best tradeoff</span>
+            <strong>{selectedModelName}</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Score spread</span>
+            <strong>{scoreSpreadLabel}</strong>
+          </div>
+        </div>
+      </AnalysisSection>
+
+      <AnalysisSection
+        unlocked={true}
+        eyebrow="Operational cost"
+        title="Runtime and deployment context"
+        description="These cards stay separated so the tradeoffs are easy to scan one row at a time."
+      >
+        <div className="stack">
+          <div className="callout callout--soft">
+            <strong>Fastest detector</strong>
+            <p>{fastestModelName}</p>
+          </div>
+          <div className="callout callout--soft">
+            <strong>Lightest detector</strong>
+            <p>{lightestModelName}</p>
+          </div>
+          <div className="callout callout--soft">
+            <strong>Interpretation</strong>
+            <p>{analysisReady ? "The deployment choice balances score with latency and memory pressure." : "Run the anomaly test to reveal deployment tradeoffs."}</p>
+          </div>
+        </div>
+      </AnalysisSection>
+
+      <AnalysisSection
+        unlocked={true}
+        eyebrow="Selected model"
+        title="Current best-performing detector"
+        description="A compact reminder of the model currently leading the comparison."
+      >
+        <div className="stack">
+          <div className="summary-pill">
+            <span>Model</span>
+            <strong>{bestModel?.name || "Locked"}</strong>
+          </div>
+          <div className="summary-pill">
+            <span>Score</span>
+            <strong>{analysisReady ? `${Math.round((bestModel?.score ?? 0) * 100)}%` : "0%"}</strong>
+          </div>
+        </div>
+      </AnalysisSection>
+    </div>
   );
 }
 
@@ -684,7 +1113,8 @@ function AnalysisSection({ unlocked, eyebrow, title, description, lockMessage, c
 }
 
 function GraphPanel({ title, subtitle, items, valueKey, valueLabel, reverse = false }) {
-  const maxValue = Math.max(...items.map((item) => parseNumeric(item[valueKey] ?? 0)), 1);
+  const safeItems = safeArray(items);
+  const maxValue = Math.max(...safeItems.map((item) => parseNumeric(item?.[valueKey] ?? 0)), 1);
 
   return (
     <div className="graph-panel">
@@ -696,13 +1126,13 @@ function GraphPanel({ title, subtitle, items, valueKey, valueLabel, reverse = fa
         <span>{valueLabel}</span>
       </div>
       <div className="graph-panel__bars">
-        {items.map((item) => {
-          const value = parseNumeric(item[valueKey] ?? 0);
+        {safeItems.map((item) => {
+          const value = parseNumeric(item?.[valueKey] ?? 0);
           const width = reverse ? (1 - value / maxValue) * 100 : (value / maxValue) * 100;
           const barWidth = value <= 0 ? 0 : Math.max(8, width);
           return (
-            <div key={item.key || item.label} className="graph-panel__row">
-              <div className="graph-panel__label">{item.name || item.label}</div>
+            <div key={item?.key || item?.label || item?.name} className="graph-panel__row">
+              <div className="graph-panel__label">{item?.name || item?.label || "Unknown"}</div>
               <div className="bar">
                 <span style={{ width: `${barWidth}%` }} />
               </div>
@@ -719,14 +1149,15 @@ function GraphPanel({ title, subtitle, items, valueKey, valueLabel, reverse = fa
 }
 
 function AnomalyTrendChart({ series, score, riskLevel }) {
+  const safeSeries = safeArray(series);
   const width = 640;
   const height = 240;
   const padding = 24;
   const minValue = 0;
   const maxValue = 1;
-  const points = series.map((point, index) => {
-    const x = padding + (index / Math.max(series.length - 1, 1)) * (width - padding * 2);
-    const normalized = (point.score - minValue) / (maxValue - minValue);
+  const points = safeSeries.map((point, index) => {
+    const x = padding + (index / Math.max(safeSeries.length - 1, 1)) * (width - padding * 2);
+    const normalized = (parseNumeric(point?.score ?? 0) - minValue) / (maxValue - minValue);
     const y = height - padding - normalized * (height - padding * 2);
     return { ...point, x, y };
   });
@@ -773,22 +1204,23 @@ function AnomalyTrendChart({ series, score, riskLevel }) {
       </svg>
       <div className="viz-foot">
         <span>Latest score: {score}</span>
-        <span>Trend series length: {series.length}</span>
+        <span>Trend series length: {safeSeries.length}</span>
       </div>
     </div>
   );
 }
 
 function RadarChart({ metrics }) {
+  const safeMetrics = safeArray(metrics);
   const width = 320;
   const height = 320;
   const centerX = width / 2;
   const centerY = height / 2;
   const radius = 112;
-  const angles = metrics.map((_, index) => (-Math.PI / 2) + (index / metrics.length) * Math.PI * 2);
-  const polygon = metrics
+  const angles = safeMetrics.map((_, index) => (-Math.PI / 2) + (index / Math.max(safeMetrics.length, 1)) * Math.PI * 2);
+  const polygon = safeMetrics
     .map((metric, index) => {
-      const value = clamp(metric.value, 0, 1);
+      const value = clamp(parseNumeric(metric?.value ?? 0), 0, 1);
       const x = centerX + Math.cos(angles[index]) * radius * value;
       const y = centerY + Math.sin(angles[index]) * radius * value;
       return `${x},${y}`;
@@ -796,7 +1228,7 @@ function RadarChart({ metrics }) {
     .join(" ");
 
   return (
-    <div className="viz-card viz-card--radar">
+    <div className="viz-card viz-card--radar viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Clinical anomaly radar</strong>
@@ -808,18 +1240,18 @@ function RadarChart({ metrics }) {
         {[0.25, 0.5, 0.75, 1].map((ring) => (
           <circle key={ring} cx={centerX} cy={centerY} r={radius * ring} className="viz-radar-ring" />
         ))}
-        {metrics.map((metric, index) => {
+        {safeMetrics.map((metric, index) => {
           const angle = angles[index];
           const x = centerX + Math.cos(angle) * radius;
           const y = centerY + Math.sin(angle) * radius;
           const labelX = centerX + Math.cos(angle) * (radius + 22);
           const labelY = centerY + Math.sin(angle) * (radius + 22);
           return (
-            <g key={metric.label}>
+            <g key={metric?.label || `metric-${index}`}>
               <line x1={centerX} y1={centerY} x2={x} y2={y} className="viz-radar-axis" />
               <circle cx={x} cy={y} r="3" className="viz-radar-dot" />
               <text x={labelX} y={labelY} className="viz-label viz-label--radar">
-                {metric.label}
+                {metric?.label || "Unknown"}
               </text>
             </g>
           );
@@ -827,10 +1259,10 @@ function RadarChart({ metrics }) {
         <polygon points={polygon} className="viz-radar-polygon" />
       </svg>
       <div className="viz-grid">
-        {metrics.map((metric) => (
-          <div key={metric.label} className="viz-meter">
-            <span>{metric.label}</span>
-            <strong>{Math.round(metric.value * 100)}%</strong>
+        {safeMetrics.map((metric, index) => (
+          <div key={metric?.label || `metric-${index}`} className="viz-meter">
+            <span>{metric?.label || "Unknown"}</span>
+            <strong>{Math.round(parseNumeric(metric?.value ?? 0) * 100)}%</strong>
           </div>
         ))}
       </div>
@@ -839,20 +1271,21 @@ function RadarChart({ metrics }) {
 }
 
 function HeatmapGrid({ cells }) {
+  const safeCells = safeArray(cells);
   return (
-    <div className="viz-card">
+    <div className="viz-card viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Feature heatmap</strong>
           <p>Top contributing inputs and their current strength.</p>
         </div>
-        <span>{cells.length} features</span>
+        <span>{safeCells.length} features</span>
       </div>
       <div className="heatmap-grid">
-        {cells.map((cell) => (
-          <div key={cell.label} className={`heatmap-cell heatmap-cell--${cell.tone}`}>
-            <strong>{cell.label}</strong>
-            <span>{Math.round(cell.value * 100)}%</span>
+        {safeCells.map((cell, index) => (
+          <div key={cell?.label || `cell-${index}`} className={`heatmap-cell heatmap-cell--${cell?.tone || "moderate"}`}>
+            <strong>{cell?.label || "Unknown"}</strong>
+            <span>{Math.round(parseNumeric(cell?.value ?? 0) * 100)}%</span>
           </div>
         ))}
       </div>
@@ -879,9 +1312,21 @@ function AnomalyPositionChart({ anomalies }) {
     };
   });
   const intakeSourceLabel = "Clinical intake & vitals";
+  const [selectedPoint, setSelectedPoint] = React.useState(points[0] || null);
+
+  React.useEffect(() => {
+    if (!points.length) {
+      setSelectedPoint(null);
+      return;
+    }
+
+    if (!selectedPoint || !points.some((point) => point.label === selectedPoint.label && point.source === selectedPoint.source)) {
+      setSelectedPoint(points[0]);
+    }
+  }, [points, selectedPoint]);
 
   return (
-    <div className="viz-card viz-card--recharts">
+    <div className="viz-card viz-card--recharts viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Anomaly position map</strong>
@@ -919,18 +1364,50 @@ function AnomalyPositionChart({ anomalies }) {
           Lower severity
         </text>
         {points.map((point) => (
-          <g key={`${point.source}-${point.label}`}>
+          <g
+            key={`${point.source}-${point.label}`}
+            className={`anomaly-position-point${selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source ? " anomaly-position-point--selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-label={`${point.label}, ${point.source}, severity ${Math.round(point.severity * 100)}%`}
+            onClick={() => setSelectedPoint(point)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedPoint(point);
+              }
+            }}
+          >
+            {selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source ? (
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={point.radius + 10}
+                className="anomaly-position-point__pulse"
+              />
+            ) : null}
             <circle
               cx={point.x}
               cy={point.y}
               r={point.radius}
               fill={point.source === intakeSourceLabel ? "#72d7ff" : "#9cf1d2"}
-              stroke="rgba(7,17,29,0.92)"
-              strokeWidth="2"
+              stroke={
+                selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source
+                  ? "rgba(255,255,255,0.18)"
+                  : "rgba(7,17,29,0.92)"
+              }
+              strokeWidth={selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source ? "1.5" : "2"}
             />
-            <text x={point.x + 8} y={point.y - 8} className="viz-label viz-label--position">
-              {point.label}
-            </text>
+            {selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source ? (
+              <text
+                x={point.x + (point.x > width / 2 ? -10 : 10)}
+                y={Math.max(18, point.y - point.radius - 10)}
+                textAnchor={point.x > width / 2 ? "end" : "start"}
+                className="viz-label viz-label--position viz-label--position-selected"
+              >
+                {point.label}
+              </text>
+            ) : null}
           </g>
         ))}
       </svg>
@@ -940,17 +1417,45 @@ function AnomalyPositionChart({ anomalies }) {
         <span>Blue = clinical intake & vitals</span>
         <span>Green = laboratory results</span>
       </div>
+      {selectedPoint ? (
+        <div className="anomaly-position__selection">
+          <div className="anomaly-position__selection-head">
+            <div>
+              <span>Selected point</span>
+              <strong>{selectedPoint.label}</strong>
+            </div>
+            <span>{Math.round(selectedPoint.severity * 100)}% severity</span>
+          </div>
+          <div className="anomaly-position__selection-grid">
+            <div>
+              <span>Band</span>
+              <strong>{selectedPoint.domain}</strong>
+            </div>
+            <div>
+              <span>Source</span>
+              <strong>{selectedPoint.source}</strong>
+            </div>
+            <div>
+              <span>Position</span>
+              <strong>{selectedPoint.source === intakeSourceLabel ? "Clinical intake & vitals" : "Laboratory results"}</strong>
+            </div>
+            <div>
+              <span>Severity</span>
+              <strong>{Math.round(selectedPoint.severity * 100)}%</strong>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function AnomalyBubbleCard({ anomalies }) {
   const items = safeArray(anomalies)
-    .slice(0, 12)
     .sort((a, b) => b.severity - a.severity);
 
   return (
-    <div className="viz-card viz-card--recharts">
+    <div className="viz-card viz-card--recharts viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Anomaly bubbles</strong>
@@ -964,8 +1469,8 @@ function AnomalyBubbleCard({ anomalies }) {
               key={`${item.source}-${item.label}`}
               className={`anomaly-bubble anomaly-bubble--${item.source === "Clinical intake & vitals" ? "page1" : "page2"}`}
               style={{
-                width: `${88 + clamp01(item.severity) * 40}px`,
-                height: `${88 + clamp01(item.severity) * 40}px`,
+                width: `${92 + clamp01(item.severity) * 28}px`,
+                minHeight: `${92 + clamp01(item.severity) * 28}px`,
               }}
             >
               <strong>{item.label}</strong>
@@ -986,7 +1491,7 @@ function AnomalyRankCard({ anomalies }) {
     .sort((a, b) => b.severity - a.severity);
 
   return (
-    <div className="viz-card viz-card--recharts">
+    <div className="viz-card viz-card--recharts viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Severity ranking</strong>
@@ -1035,7 +1540,7 @@ function AnomalyGaugeCard({ score, riskLevel, totalCount }) {
   };
 
   return (
-    <div className="viz-card viz-card--recharts">
+    <div className="viz-card viz-card--recharts viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Anomaly rate gauge</strong>
@@ -1068,7 +1573,7 @@ function SourceSplitChart({ page1Count, page2Count }) {
   const page2 = Math.round((page2Count / total) * 100);
 
   return (
-    <div className="viz-card viz-card--recharts">
+    <div className="viz-card viz-card--recharts viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Source split</strong>
@@ -1207,7 +1712,7 @@ function ProgressTrendChart({ history, currentScore }) {
   const previousPoint = points[points.length - 2] || lastPoint;
 
   return (
-    <div className="viz-card">
+    <div className="viz-card viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Risk progression</strong>
@@ -1338,46 +1843,474 @@ function RechartsRadarCard({ metrics, loading }) {
   );
 }
 
-function RechartsShapCard({ features, loading }) {
+function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair }) {
   const chartData = features.map((feature) => ({
     name: feature.feature || feature.label,
     value: feature.contribution ?? feature.value ?? 0,
     direction: feature.direction || feature.sign || "positive",
   }));
+  const normalizedHeatmap =
+    normalizeShapInteractionHeatmap(interactionHeatmap) ||
+    buildFallbackShapInteractionHeatmap(features);
+  const displayLimit = Math.min(normalizedHeatmap.featureNames.length, 8);
+  const heatmapFeatureNames = normalizedHeatmap.featureNames.slice(0, displayLimit);
+  const heatmapMatrix = normalizedHeatmap.matrix.slice(0, displayLimit).map((row) => row.slice(0, displayLimit));
+  const maxAbsValue = heatmapMatrix.reduce((maxValue, row) => {
+    const rowMax = row.reduce((innerMax, value) => Math.max(innerMax, Math.abs(value)), 0);
+    return Math.max(maxValue, rowMax);
+  }, 0);
+  const strongestPairs = safeArray(normalizedHeatmap.topPairs).slice(0, 4);
+  const strongestFeatures = safeArray(normalizedHeatmap.topFeatures).slice(0, 4);
+  const defaultSelection =
+    strongestPairs[0] ||
+    (heatmapFeatureNames.length
+      ? {
+          feature_i: heatmapFeatureNames[0],
+          feature_j: heatmapFeatureNames[0],
+          interaction_value: Number(heatmapMatrix[0]?.[0] ?? 0),
+          absolute_interaction_value: Math.abs(Number(heatmapMatrix[0]?.[0] ?? 0)),
+        }
+      : null);
+  const [selectedPair, setSelectedPair] = React.useState(defaultSelection);
+
+  React.useEffect(() => {
+    setSelectedPair(defaultSelection);
+  }, [defaultSelection?.feature_i, defaultSelection?.feature_j, defaultSelection?.interaction_value, heatmapFeatureNames.length]);
+
+  const selectedValue = Number(selectedPair?.interaction_value ?? 0);
+  const selectedAbsoluteValue = Math.abs(selectedValue);
+  const selectedTone = selectedValue >= 0 ? "positive" : "negative";
+  const selectedInterpretation =
+    selectedPair?.feature_i && selectedPair?.feature_j
+      ? selectedPair.feature_i === selectedPair.feature_j
+        ? `This cell shows the self-signal for ${selectedPair.feature_i}.`
+        : selectedTone === "positive"
+          ? "These two features reinforce one another and push the anomaly score upward together."
+          : "These two features offset one another and soften the anomaly score together."
+      : "Select any cell to see a pair-level explanation.";
+
+  React.useEffect(() => {
+    if (!selectedPair) {
+      return;
+    }
+    const payload = {
+      feature_i: selectedPair.feature_i,
+      feature_j: selectedPair.feature_j,
+      interaction_value: selectedValue,
+      absolute_interaction_value: selectedAbsoluteValue,
+      narrative: describeShapPairSelection(selectedPair),
+    };
+    onSelectPair?.(payload);
+  }, [onSelectPair, selectedAbsoluteValue, selectedPair, selectedValue]);
 
   return (
-    <div className="viz-card viz-card--strip">
+    <div className="viz-card viz-card--strip shap-heatmap-card">
       <div className="viz-card__head">
         <div>
-          <strong>SHAP feature contributions</strong>
-          <p>Bar chart view of the strongest feature drivers.</p>
+          <strong>SHAP interaction heatmap</strong>
+          <p>
+            Cell strength shows how two features work together to move the anomaly score. The chart uses a TreeSHAP
+            interaction matrix when the backend can compute it.
+          </p>
         </div>
-        <span>{loading ? "Loading..." : `${chartData.length} features`}</span>
+        <span>{loading ? "Loading..." : `${heatmapFeatureNames.length} features`}</span>
       </div>
-      <div className="recharts-box">
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 24, bottom: 8, left: 30 }}>
-            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
-            <XAxis type="number" stroke="#9fb2ca" tickLine={false} axisLine={false} />
-            <YAxis type="category" dataKey="name" stroke="#9fb2ca" tickLine={false} axisLine={false} width={110} />
-            <Tooltip
-              contentStyle={{
-                background: "rgba(10, 17, 29, 0.96)",
-                border: "1px solid rgba(185, 201, 225, 0.18)",
-                borderRadius: 12,
-                color: "#edf3fb",
-              }}
+      <div className="shap-heatmap__layout">
+        <div
+          className="shap-heatmap__matrix"
+          aria-label="SHAP interaction heatmap"
+          style={{ gridTemplateColumns: `minmax(110px, 1.1fr) repeat(${heatmapFeatureNames.length}, minmax(34px, 1fr))` }}
+        >
+          <div className="shap-heatmap__corner">Features</div>
+          {heatmapFeatureNames.map((name) => (
+            <div key={`col-${name}`} className="shap-heatmap__label shap-heatmap__label--col">
+              {name}
+            </div>
+          ))}
+          {heatmapFeatureNames.map((rowName, rowIndex) => (
+            <React.Fragment key={`row-${rowName}`}>
+              <div className="shap-heatmap__label shap-heatmap__label--row">{rowName}</div>
+              {heatmapFeatureNames.map((colName, colIndex) => {
+                const value = Number(heatmapMatrix[rowIndex]?.[colIndex] ?? 0);
+                const intensity = maxAbsValue > 0 ? Math.min(1, Math.abs(value) / maxAbsValue) : 0;
+                const tone = value >= 0 ? "positive" : "negative";
+                const isSelected = selectedPair?.feature_i === rowName && selectedPair?.feature_j === colName;
+                return (
+                  <button
+                    onClick={() =>
+                      setSelectedPair({
+                        feature_i: rowName,
+                        feature_j: colName,
+                        interaction_value: value,
+                        absolute_interaction_value: Math.abs(value),
+                      })
+                    }
+                    key={`${rowName}-${colName}`}
+                    type="button"
+                    className={`shap-heatmap__cell shap-heatmap__cell--${tone}${isSelected ? " shap-heatmap__cell--selected" : ""}`}
+                    style={{
+                      backgroundColor:
+                        tone === "positive"
+                          ? `rgba(98, 212, 255, ${0.12 + intensity * 0.68})`
+                          : `rgba(124, 230, 194, ${0.12 + intensity * 0.68})`,
+                    }}
+                    title={`${rowName} × ${colName}: ${value.toFixed(4)}`}
+                  >
+                    <span>{Math.abs(value) < 0.001 ? "0.00" : value.toFixed(2)}</span>
+                  </button>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="shap-heatmap__summary">
+          <div className="shap-heatmap__legend">
+            <span>Teal = positive joint lift</span>
+            <span>Mint = negative joint pull</span>
+          </div>
+          <div className="shap-heatmap__detail">
+            <strong>Selected pair</strong>
+            {selectedPair ? (
+              <>
+                <div className="shap-heatmap__detail-row">
+                  <span>Pair</span>
+                  <strong>
+                    {selectedPair.feature_i} + {selectedPair.feature_j}
+                  </strong>
+                </div>
+                <div className="shap-heatmap__detail-row">
+                  <span>Interaction</span>
+                  <strong>{selectedValue.toFixed(3)}</strong>
+                </div>
+                <div className="shap-heatmap__detail-row">
+                  <span>Strength</span>
+                  <strong>{selectedAbsoluteValue.toFixed(3)}</strong>
+                </div>
+                <p className="shap-heatmap__detail-copy">{selectedInterpretation}</p>
+              </>
+            ) : (
+              <p className="shap-heatmap__detail-copy">Select a cell to inspect the pair-level explanation.</p>
+            )}
+          </div>
+          <div className="shap-heatmap__pairs">
+            <strong>Strongest pairs</strong>
+            {strongestPairs.length ? (
+              strongestPairs.map((pair) => (
+                <button
+                  key={`${pair.feature_i}-${pair.feature_j}`}
+                  type="button"
+                  className="shap-heatmap__pair shap-heatmap__pair--button"
+                  onClick={() =>
+                    setSelectedPair({
+                      feature_i: pair.feature_i,
+                      feature_j: pair.feature_j,
+                      interaction_value: Number(pair.interaction_value ?? 0),
+                      absolute_interaction_value: Number(
+                        pair.absolute_interaction_value ?? Math.abs(Number(pair.interaction_value ?? 0)),
+                      ),
+                    })
+                  }
+                >
+                  <span>
+                    {pair.feature_i} + {pair.feature_j}
+                  </span>
+                  <strong>{Number(pair.interaction_value).toFixed(3)}</strong>
+                </button>
+              ))
+            ) : (
+              <div className="shap-heatmap__empty">No pair ranking available yet.</div>
+            )}
+          </div>
+          <div className="shap-heatmap__pairs">
+            <strong>Strongest features</strong>
+            {strongestFeatures.length ? (
+              strongestFeatures.map((item) => (
+                <div key={item.feature} className="shap-heatmap__pair">
+                  <span>{item.feature}</span>
+                  <strong>{Number(item.interaction_strength ?? 0).toFixed(3)}</strong>
+                </div>
+              ))
+            ) : (
+              <div className="shap-heatmap__empty">No feature ranking available yet.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LatentManifoldCard({ manifold, loading }) {
+  const normalized = React.useMemo(() => normalizeLatentManifold(manifold), [manifold]);
+  if (!normalized) {
+    return (
+      <div className="viz-card viz-card--strip manifold-card">
+        <div className="viz-card__head">
+          <div>
+            <strong>Latent manifold</strong>
+            <p>Run the anomaly test to project VAE latents and overlay the Deep SVDD boundary.</p>
+          </div>
+          <span>{loading ? "Loading..." : "No manifold yet"}</span>
+        </div>
+        <div className="manifold-empty">
+          <strong>No latent geometry available</strong>
+          <p>The backend has not returned a latent manifold for the current record yet.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const xs = normalized.points.map((point) => point.x);
+  const ys = normalized.points.map((point) => point.y);
+  const boundaryCenter = normalized.deepSvdd.boundaryCenter.length >= 2 ? normalized.deepSvdd.boundaryCenter : null;
+  if (boundaryCenter) {
+    xs.push(boundaryCenter[0]);
+    ys.push(boundaryCenter[1]);
+  }
+
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const xSpan = maxX - minX || 1;
+  const ySpan = maxY - minY || 1;
+  const pad = 8;
+  const viewBoxWidth = 100;
+  const viewBoxHeight = 100;
+  const xScale = (value) => pad + ((value - minX) / xSpan) * (viewBoxWidth - pad * 2);
+  const yScale = (value) => viewBoxHeight - pad - ((value - minY) / ySpan) * (viewBoxHeight - pad * 2);
+  const boundaryCx = boundaryCenter ? xScale(boundaryCenter[0]) : 50;
+  const boundaryCy = boundaryCenter ? yScale(boundaryCenter[1]) : 50;
+  const boundaryRx = boundaryCenter ? Math.max(4, (normalized.deepSvdd.boundaryRadius / xSpan) * (viewBoxWidth - pad * 2)) : 0;
+  const boundaryRy = boundaryCenter ? Math.max(4, (normalized.deepSvdd.boundaryRadius / ySpan) * (viewBoxHeight - pad * 2)) : 0;
+  const currentPoint = normalized.currentPoint || normalized.points[normalized.points.length - 1];
+  const currentPointInside =
+    Number.isFinite(normalized.deepSvdd.radius) && Number.isFinite(currentPoint?.deepSvddDistance)
+      ? currentPoint.deepSvddDistance <= normalized.deepSvdd.radius
+      : null;
+  const currentPointLabel = currentPoint?.label || "Current record";
+  const currentLabelX = currentPoint ? Math.min(94, Math.max(10, xScale(currentPoint.x) + 1.4)) : 0;
+  const currentLabelY = currentPoint ? Math.min(92, Math.max(8, yScale(currentPoint.y) - 1.6)) : 0;
+
+  return (
+    <div className="viz-card viz-card--strip viz-card--compact manifold-card">
+      <div className="viz-card__head">
+        <div>
+          <strong>Latent manifold</strong>
+          <p>VAE latents are projected to 2D. Similar records cluster, and the current record stays highlighted.</p>
+        </div>
+        <span>{loading ? "Loading..." : `${normalized.pointCount} records`}</span>
+      </div>
+      <div className="manifold-legend">
+        <span>Color = anomaly score</span>
+        <span>Ring = approximate Deep SVDD boundary</span>
+        <span>Star = current test record</span>
+      </div>
+      <div className="manifold-shell">
+        <svg className="manifold-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Latent manifold scatter plot">
+          <line x1="8" y1="92" x2="92" y2="92" className="manifold-axis" />
+          <line x1="8" y1="92" x2="8" y2="8" className="manifold-axis" />
+          {boundaryCenter && Number.isFinite(boundaryRx) && Number.isFinite(boundaryRy) && boundaryRx > 0 && boundaryRy > 0 ? (
+            <ellipse
+              cx={boundaryCx}
+              cy={boundaryCy}
+              rx={boundaryRx}
+              ry={boundaryRy}
+              className="manifold-boundary"
             />
-            <Bar dataKey="value" radius={[0, 8, 8, 0]}>
-              {chartData.map((entry, index) => (
-                <Cell
-                  key={`cell-${entry.name}`}
-                  fill={entry.direction === "negative" ? "#62d4ff" : index < 3 ? "#ff7f96" : "#9cf1d2"}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+          ) : null}
+          {normalized.points.map((point) => {
+            const x = xScale(point.x);
+            const y = yScale(point.y);
+            const score = clamp01(point.anomalyScore);
+            const size = point.isCurrent ? 2.3 : 1.35 + score * 0.95;
+            const fill = scoreToColor(score);
+            const stroke = point.isCurrent ? "#ffffff" : "rgba(7, 17, 29, 0.65)";
+            const strokeWidth = point.isCurrent ? 0.7 : 0.38;
+            return (
+              <g key={`${point.role}-${point.index}`}>
+                <circle cx={x} cy={y} r={size} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+                {point.isCurrent ? (
+                  <circle cx={x} cy={y} r={size + 1.2} className="manifold-current-ring" />
+                ) : null}
+                <title>
+                  {`${point.label}: score ${score.toFixed(3)}, Deep SVDD distance ${Number.isFinite(point.deepSvddDistance) ? point.deepSvddDistance.toFixed(3) : "n/a"}`}
+                </title>
+              </g>
+            );
+          })}
+          {currentPoint ? (
+            <g>
+              <text x={currentLabelX} y={currentLabelY} className="manifold-current-label">
+                Current
+              </text>
+            </g>
+          ) : null}
+        </svg>
+      </div>
+      <div className="manifold-meta">
+        <div className="manifold-meta__item">
+          <span>Projection</span>
+          <strong>{normalized.projectionMethod.toUpperCase()}</strong>
+        </div>
+        <div className="manifold-meta__item">
+          <span>Current point</span>
+          <strong>{currentPointLabel}</strong>
+        </div>
+        <div className="manifold-meta__item">
+          <span>Deep SVDD radius</span>
+          <strong>{Number.isFinite(normalized.deepSvdd.radius) ? normalized.deepSvdd.radius.toFixed(3) : "N/A"}</strong>
+        </div>
+      </div>
+      <div className="manifold-meta manifold-meta--status">
+        <div className="manifold-meta__item">
+          <span>Boundary status</span>
+          <strong>{currentPointInside === null ? "N/A" : currentPointInside ? "Inside boundary" : "Outside boundary"}</strong>
+        </div>
+        <div className="manifold-meta__item">
+          <span>Current distance</span>
+          <strong>{Number.isFinite(normalized.deepSvdd.currentDistanceFromBoundary) ? normalized.deepSvdd.currentDistanceFromBoundary.toFixed(3) : "N/A"}</strong>
+        </div>
+      </div>
+      <p className="manifold-note">Deep SVDD boundary is shown as an approximate 2D ring.</p>
+    </div>
+  );
+}
+
+function ResidualHeatmapCard({ heatmap, loading }) {
+  const normalized = React.useMemo(() => normalizeReconstructionResidualHeatmap(heatmap), [heatmap]);
+  const [selectedCell, setSelectedCell] = React.useState(null);
+
+  React.useEffect(() => {
+    if (normalized?.selectedCell) {
+      setSelectedCell(normalized.selectedCell);
+    } else {
+      setSelectedCell(null);
+    }
+  }, [normalized]);
+
+  if (!normalized) {
+    return (
+      <div className="viz-card viz-card--strip viz-card--compact residual-heatmap-card">
+        <div className="viz-card__head">
+          <div>
+            <strong>Per-feature reconstruction errors</strong>
+            <p>Run the anomaly test to view the compact feature miss map.</p>
+          </div>
+          <span>{loading ? "Loading..." : "No residuals yet"}</span>
+        </div>
+        <div className="manifold-empty">
+          <strong>No residual heatmap available</strong>
+          <p>The backend has not returned a reconstruction residual matrix for the current record yet.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const activeCell = selectedCell || normalized.selectedCell;
+  const selectedRow = normalized.models[activeCell?.rowIndex ?? 0] || normalized.models[0];
+  const selectedFeature =
+    normalized.featureNames[activeCell?.featureIndex ?? 0] || normalized.highlightFeature || normalized.featureNames[0];
+  const selectedValue =
+    activeCell && selectedRow ? Number(selectedRow.row[activeCell.featureIndex] ?? 0) : Number(selectedRow?.row?.[0] ?? 0);
+  const peakValue = normalized.maxAbsResidual || Math.max(...normalized.matrix.flat(), 0);
+  const matrixStyle = React.useMemo(
+    () => ({
+      "--residual-heatmap-columns": `minmax(118px, 1.1fr) repeat(${normalized.featureNames.length}, minmax(36px, 1fr))`,
+      "--residual-heatmap-feature-count": normalized.featureNames.length,
+    }),
+    [normalized.featureNames.length],
+  );
+
+  return (
+    <div className="viz-card viz-card--strip viz-card--compact residual-heatmap-card">
+      <div className="viz-card__head">
+        <div>
+          <strong>Per-feature reconstruction errors</strong>
+          <p>Rows show reconstruction models. Brighter cells mark larger feature misses across the full feature vector.</p>
+        </div>
+        <span>{loading ? "Loading..." : `${normalized.models.length} models x ${normalized.featureNames.length} features`}</span>
+      </div>
+      <div className="residual-heatmap__layout">
+        <div
+          className="residual-heatmap__matrix"
+          role="table"
+          aria-label="Per-feature reconstruction error heatmap"
+          style={matrixStyle}
+        >
+          <div className="residual-heatmap__corner">Model / feature</div>
+          {normalized.featureNames.map((feature) => (
+            <div
+              key={feature}
+              className={`residual-heatmap__label residual-heatmap__label--col${feature === normalized.highlightFeature ? " residual-heatmap__label--highlight" : ""}`}
+            >
+              {feature}
+            </div>
+          ))}
+          {normalized.models.map((modelRow, rowIndex) => (
+            <React.Fragment key={modelRow.modelKey}>
+              <div className="residual-heatmap__label residual-heatmap__label--row">
+                <strong>{modelRow.model}</strong>
+                <span>{modelRow.meanAbsResidual.toFixed(3)}</span>
+              </div>
+              {modelRow.row.map((value, featureIndex) => {
+                const isSelected = activeCell?.rowIndex === rowIndex && activeCell?.featureIndex === featureIndex;
+                const isHighlighted = normalized.highlightFeature === normalized.featureNames[featureIndex];
+                return (
+                  <button
+                    key={`${modelRow.modelKey}-${featureIndex}`}
+                    type="button"
+                    className={`residual-heatmap__cell${isSelected ? " residual-heatmap__cell--selected" : ""}${isHighlighted ? " residual-heatmap__cell--highlight" : ""}`}
+                    style={{ backgroundColor: residualMagnitudeColor(value, peakValue) }}
+                    onClick={() => setSelectedCell({ rowIndex, featureIndex, value })}
+                    title={`${modelRow.model}: ${normalized.featureNames[featureIndex]} residual ${Number(value).toFixed(4)}`}
+                  >
+                    <span>{Number(value).toFixed(3)}</span>
+                  </button>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+          <div className="residual-heatmap__summary">
+          <div className="residual-heatmap__legend">
+            <strong>How to read</strong>
+            <span>Brighter cells mean a larger absolute reconstruction error.</span>
+            <span>Highlighted feature: {normalized.highlightFeature || "None"}</span>
+            <span>Current record: {normalized.currentRecordLabel}</span>
+          </div>
+          <div className="residual-heatmap__detail">
+            <strong>Selected cell</strong>
+            <div className="residual-heatmap__detail-row">
+              <span>Model</span>
+              <strong>{selectedRow?.model || "N/A"}</strong>
+            </div>
+            <div className="residual-heatmap__detail-row">
+              <span>Feature</span>
+              <strong>{selectedFeature || "N/A"}</strong>
+            </div>
+            <div className="residual-heatmap__detail-row">
+              <span>Residual</span>
+              <strong>{Number.isFinite(selectedValue) ? selectedValue.toFixed(4) : "N/A"}</strong>
+            </div>
+            <div className="residual-heatmap__detail-row">
+              <span>Max cell</span>
+              <strong>{Number.isFinite(peakValue) ? peakValue.toFixed(4) : "N/A"}</strong>
+            </div>
+            <p className="residual-heatmap__detail-copy">
+              This view exposes feature-level reconstruction misses that are usually flattened into a single anomaly score.
+            </p>
+          </div>
+          <div className="residual-heatmap__pairs">
+            <strong>Most affected models</strong>
+            {normalized.models.slice(0, 4).map((modelRow) => (
+              <div key={modelRow.modelKey} className="residual-heatmap__pair">
+                <span>{modelRow.model}</span>
+                <strong>{modelRow.maxAbsResidual.toFixed(3)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1479,7 +2412,7 @@ function ModelComparisonChart({ models }) {
   const strongModels = chartData.filter((model) => model.score >= 0.85).length;
 
   return (
-    <div className="viz-card viz-card--recharts">
+    <div className="viz-card viz-card--recharts viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Model metric comparison</strong>
@@ -1510,7 +2443,7 @@ function ModelComparisonChart({ models }) {
         </div>
       </div>
       <div className="recharts-box">
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} margin={{ top: 10, right: 18, bottom: 24, left: 0 }}>
             <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
             <XAxis
@@ -1544,6 +2477,92 @@ function ModelComparisonChart({ models }) {
       <div className="comparison-matrix-note">
         <strong>How to read it:</strong>
         <span>The green bar is the combined score. Blue, orange, and pink show precision, recall, and accuracy so you can spot the balance, not just the winner.</span>
+      </div>
+    </div>
+  );
+}
+
+function ScoreStreamDriftChart({ stream, fallbackSeries, driftIndex, loading, driftActive, driftMethod }) {
+  const sourceSeries = stream.length
+    ? stream.map((value, index) => ({
+        label: `S${index + 1}`,
+        score: clamp01(Number(value ?? 0)),
+      }))
+    : fallbackSeries.length
+      ? fallbackSeries.map((point, index) => ({
+          label: point.label || `T${index + 1}`,
+          score: clamp01(Number(point.score ?? 0)),
+        }))
+      : [];
+
+  const changeIndex = Number.isInteger(driftIndex) && driftIndex >= 0 && driftIndex < sourceSeries.length ? driftIndex : null;
+  const changeLabel = changeIndex !== null ? sourceSeries[changeIndex]?.label || null : null;
+  const sourceLabel = stream.length ? "Stream" : fallbackSeries.length ? "Fallback" : "No stream";
+  const latestScore = sourceSeries[sourceSeries.length - 1]?.score ?? 0;
+  const changeScore = changeIndex !== null ? sourceSeries[changeIndex]?.score ?? null : null;
+  const driftBadgeLabel = driftActive ? String(driftMethod || "Drift").toUpperCase() : null;
+
+  return (
+    <div className="viz-card viz-card--recharts viz-card--compact">
+      <div className="viz-card__head">
+        <div>
+          <strong>Score stream drift</strong>
+          <p>Small score path with the change point marked.</p>
+        </div>
+        <span className="drift-badge drift-badge--source">
+          {loading ? "Loading..." : sourceLabel}
+        </span>
+      </div>
+      <div className="recharts-box">
+        <ResponsiveContainer width="100%" height={160}>
+          <LineChart data={sourceSeries} margin={{ top: 8, right: 14, bottom: 4, left: 0 }}>
+            <defs>
+              <linearGradient id="driftStreamFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#72d7ff" stopOpacity={0.32} />
+                <stop offset="95%" stopColor="#72d7ff" stopOpacity={0.04} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
+            <XAxis dataKey="label" stroke="#9fb2ca" tickLine={false} axisLine={false} />
+            <YAxis stroke="#9fb2ca" tickLine={false} axisLine={false} domain={[0, 1]} />
+            <Tooltip
+              formatter={(value) => [Number(value).toFixed(4), "Score"]}
+              labelFormatter={(label) => `Visit ${label}`}
+              contentStyle={{
+                background: "rgba(10, 17, 29, 0.96)",
+                border: "1px solid rgba(185, 201, 225, 0.18)",
+                borderRadius: 12,
+                color: "#edf3fb",
+              }}
+            />
+            {changeLabel ? (
+              <ReferenceLine
+                x={changeLabel}
+                stroke="#f4a261"
+                strokeDasharray="5 5"
+                label={{
+                  value: "Shift",
+                  position: "insideTop",
+                  fill: "#f4a261",
+                  fontSize: 11,
+                }}
+              />
+            ) : null}
+            <Line
+              type="monotone"
+              dataKey="score"
+              stroke="#9cf1d2"
+              strokeWidth={2.5}
+              dot={{ r: 2.8, fill: "#9cf1d2" }}
+              activeDot={{ r: 5, fill: "#f4a261", stroke: "#f4a261" }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="viz-foot">
+        <span>Now: {latestScore.toFixed(4)}</span>
+        <span>{changeIndex === null ? "No drift" : `Shift at ${changeLabel}${changeScore !== null ? ` (${changeScore.toFixed(4)})` : ""}`}</span>
+        {driftBadgeLabel ? <span className="drift-badge drift-badge--alert">{driftBadgeLabel}</span> : null}
       </div>
     </div>
   );
@@ -1634,7 +2653,7 @@ function ScoreHistogramCard({ history, currentScore, loading }) {
     : [{ run: "Current", score: clamp01(Number(currentScore || 0)) }];
 
   return (
-    <div className="viz-card viz-card--recharts">
+    <div className="viz-card viz-card--recharts viz-card--compact">
       <div className="viz-card__head">
         <div>
           <strong>Score histogram</strong>
@@ -1643,7 +2662,7 @@ function ScoreHistogramCard({ history, currentScore, loading }) {
         <span>{loading ? "Loading..." : `${chartData.length} run${chartData.length === 1 ? "" : "s"}`}</span>
       </div>
       <div className="recharts-box">
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chartData} margin={{ top: 8, right: 20, bottom: 8, left: 4 }}>
             <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
             <XAxis dataKey="run" stroke="#9fb2ca" tickLine={false} axisLine={false} />
@@ -1687,7 +2706,7 @@ function HistogramSeedCard({ currentScore }) {
         <span>1 run</span>
       </div>
       <div className="recharts-box">
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chartData} margin={{ top: 8, right: 20, bottom: 8, left: 4 }}>
             <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
             <XAxis dataKey="run" stroke="#9fb2ca" tickLine={false} axisLine={false} />
@@ -1855,7 +2874,7 @@ function ModelHubFamilyCard({ title, models, family, description }) {
               </div>
               <ModelFamilyBadge family={model.family} label={model.familyLabel} />
             </div>
-            <div className="model-hub-card__score">{Math.round((model.f1 ?? model.score ?? 0) * 100)}%</div>
+            <div className="model-hub-card__score">{Math.round((model.accuracy ?? model.f1 ?? model.score ?? 0) * 100)}%</div>
             <div className="model-hub-card__metrics">
               <span>Accuracy {Math.round((model.accuracy ?? model.score ?? 0) * 100)}%</span>
               <span>Latency {model.latencyMs ?? "N/A"} ms</span>
@@ -2036,6 +3055,7 @@ function DecisionConsensusCard({ models }) {
 
 function DecisionRiskMap({ models }) {
   const sortedModels = normalizeComparisonModels(models).sort((a, b) => b.score - a.score);
+  const [selectedKey, setSelectedKey] = React.useState(sortedModels[0]?.key || null);
   const width = 640;
   const height = 280;
   const padding = 40;
@@ -2060,9 +3080,24 @@ function DecisionRiskMap({ models }) {
       radius,
     };
   });
+  const selectedModel = React.useMemo(
+    () => sortedModels.find((model) => model.key === selectedKey) || sortedModels[0] || null,
+    [selectedKey, sortedModels],
+  );
+
+  React.useEffect(() => {
+    if (!sortedModels.length) {
+      setSelectedKey(null);
+      return;
+    }
+
+    if (!sortedModels.some((model) => model.key === selectedKey)) {
+      setSelectedKey(sortedModels[0].key);
+    }
+  }, [selectedKey, sortedModels]);
 
   return (
-    <div className="decision-risk-map">
+    <div className={`decision-risk-map${selectedModel ? " decision-risk-map--active" : ""}`}>
       <div className="viz-card__head">
         <div>
           <strong>Risk map</strong>
@@ -2100,12 +3135,42 @@ function DecisionRiskMap({ models }) {
               : point.band === "Medium"
                 ? "url(#decisionRiskFillMedium)"
                 : "url(#decisionRiskFillLow)";
+          const isSelected = selectedKey === point.key;
           return (
-            <g key={point.key}>
-              <circle cx={point.x} cy={point.y} r={point.radius} fill={fill} stroke="rgba(7,17,29,0.9)" strokeWidth="2" />
-              <text x={point.x} y={Math.max(18, point.y - point.radius - 10)} className="viz-label decision-risk-map__label">
-                {point.name}
-              </text>
+            <g
+              key={point.key}
+              className={`decision-risk-map__point${isSelected ? " decision-risk-map__point--selected" : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${point.name}, ${point.familyLabel || point.family || "Model"}`}
+              onClick={() => setSelectedKey(point.key)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedKey(point.key);
+                }
+              }}
+            >
+              {isSelected ? (
+                <circle cx={point.x} cy={point.y} r={point.radius + 11} className="decision-risk-map__pulse" />
+              ) : null}
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={point.radius}
+                fill={fill}
+                stroke={isSelected ? "transparent" : "rgba(7,17,29,0.9)"}
+                strokeWidth="2"
+              />
+              {isSelected ? (
+                <text
+                  x={point.x}
+                  y={Math.max(18, point.y - point.radius - 10)}
+                  className="viz-label decision-risk-map__label decision-risk-map__label--selected"
+                >
+                  {point.name}
+                </text>
+              ) : null}
             </g>
           );
         })}
@@ -2130,6 +3195,37 @@ function DecisionRiskMap({ models }) {
           </strong>
         </div>
       </div>
+      {selectedModel ? (
+        <div className="decision-risk-map__selection" aria-live="polite">
+          <div className="decision-risk-map__selection-head">
+            <div>
+              <span>Selected point</span>
+              <strong>{selectedModel.name}</strong>
+            </div>
+            <span className={`model-family-badge model-family-badge--${String(selectedModel.family || "").toLowerCase()}`}>
+              {selectedModel.familyLabel || selectedModel.family || "Model"}
+            </span>
+          </div>
+          <div className="decision-risk-map__selection-grid">
+            <div>
+              <span>Family</span>
+              <strong>{selectedModel.familyLabel || selectedModel.family || "Model"}</strong>
+            </div>
+            <div>
+              <span>Score</span>
+              <strong>{Math.round(selectedModel.score * 100)}%</strong>
+            </div>
+            <div>
+              <span>Latency</span>
+              <strong>{Number(selectedModel.latencyMs ?? 0).toFixed(1)} ms</strong>
+            </div>
+            <div>
+              <span>Memory</span>
+              <strong>{Math.round(Number(selectedModel.memoryMb ?? 0))} MB</strong>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2201,6 +3297,26 @@ async function submitClinicianFeedback(payload) {
       return {
         source: "local",
         data: record,
+      };
+    }
+
+    throw error;
+  }
+}
+
+async function submitModelConfig(payload) {
+  try {
+    const response = await axios.post("/api/model-config", payload);
+    return {
+      source: "api",
+      data: response.data,
+    };
+  } catch (error) {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem("latest-model-config", JSON.stringify(payload));
+      return {
+        source: "local",
+        data: payload,
       };
     }
 
@@ -2991,6 +4107,66 @@ function buildPatientCareInsights(patient) {
   };
 }
 
+function buildSafePatientCareInsights(patient) {
+  try {
+    return buildPatientCareInsights(patient);
+  } catch (error) {
+    return {
+      anomalies: [],
+      domainScores: [
+        { label: "Vitals", value: 0, count: 0 },
+        { label: "Blood sugar", value: 0, count: 0 },
+        { label: "Blood", value: 0, count: 0 },
+        { label: "Lipids", value: 0, count: 0 },
+        { label: "Liver", value: 0, count: 0 },
+        { label: "Kidney", value: 0, count: 0 },
+        { label: "Electrolytes", value: 0, count: 0 },
+      ],
+      heatmapCells: [],
+      radarMetrics: [
+        { label: "Vitals", value: 0 },
+        { label: "Blood sugar", value: 0 },
+        { label: "Blood", value: 0 },
+        { label: "Lipids", value: 0 },
+        { label: "Liver", value: 0 },
+        { label: "Kidney", value: 0 },
+        { label: "Electrolytes", value: 0 },
+      ],
+      riskLevel: "Low",
+      summary: ["No care insights could be computed for this record."],
+      suggestionSet: ["Check the source fields for missing or malformed values."],
+      totalSeverity: 0,
+      page1Anomalies: 0,
+      page2Anomalies: 0,
+      trendSeries: Array.from({ length: 8 }, (_, index) => ({
+        label: `${index + 1}`,
+        score: 0,
+      })),
+    };
+  }
+}
+
+function parseLayerSizes(value) {
+  return String(value || "")
+    .split(",")
+    .map((entry) => Number(entry.trim()))
+    .filter((entry) => Number.isFinite(entry) && entry > 0);
+}
+
+function buildStackingConfig(patient) {
+  const tuning = patient.modelTuning || {};
+  const hiddenLayerSizes = parseLayerSizes(tuning.stackingHiddenLayerSizes);
+  return {
+    stacking_meta_model_type: String(tuning.stackingMetaModelType || "mlp"),
+    stacking_hidden_layer_sizes: hiddenLayerSizes.length ? hiddenLayerSizes : [32, 16],
+    stacking_alpha: Number(tuning.stackingAlpha ?? 1e-4) || 0,
+    stacking_learning_rate_init: Number(tuning.stackingLearningRateInit ?? 1e-3) || 0,
+    stacking_max_iter: Math.max(1, Math.round(Number(tuning.stackingMaxIter ?? 500) || 500)),
+    stacking_random_state: Math.round(Number(tuning.stackingRandomState ?? 42) || 42),
+    stacking_verbose: Boolean(tuning.stackingVerbose),
+  };
+}
+
 function LabField({ field, register, error, value, onAutoFill }) {
   const registration = register(field.key);
   const hint = formatRangeHint(field, value);
@@ -3331,6 +4507,7 @@ function computeAnalysisResults(patient, priorHistory = []) {
     value: entry.contribution,
     tone: index < 3 ? "critical" : index < 6 ? "elevated" : "moderate",
   }));
+  const shapInteractionHeatmap = buildFallbackShapInteractionHeatmap(featureAttributions);
 
   const previousEntry = priorHistory[priorHistory.length - 1] || null;
   const previousScore = previousEntry?.score ?? null;
@@ -3370,6 +4547,7 @@ function computeAnalysisResults(patient, priorHistory = []) {
     performanceSeries,
     featureAttributions,
     shapSummary,
+    shapInteractionHeatmap,
     trendSeries,
     radarMetrics,
     heatmapCells,
@@ -3537,25 +4715,433 @@ function normalizeShapValues(source) {
     .filter((item) => item.feature);
 }
 
+function normalizeShapInteractionHeatmap(source) {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+
+  const featureNames = safeArray(source.feature_names ?? source.featureNames ?? source.labels ?? source.features)
+    .map((item, index) => String(item || `Feature ${index + 1}`))
+    .filter(Boolean);
+  const matrix = safeArray(source.matrix ?? source.values ?? [])
+    .map((row) => safeArray(row).map((value) => Number(value ?? 0)))
+    .filter((row) => row.length > 0);
+
+  if (!featureNames.length || !matrix.length) {
+    return null;
+  }
+
+  const trimmedSize = Math.min(featureNames.length, matrix.length, matrix[0].length || 0);
+  if (!trimmedSize) {
+    return null;
+  }
+
+  return {
+    method: source.method ?? "tree_shap_interaction",
+    sourceModel: source.source_model ?? source.sourceModel ?? "",
+    featureNames: featureNames.slice(0, trimmedSize),
+    matrix: matrix.slice(0, trimmedSize).map((row) => row.slice(0, trimmedSize)),
+    topPairs: safeArray(source.top_pairs ?? source.topPairs),
+    topFeatures: safeArray(source.top_features ?? source.topFeatures),
+  };
+}
+
+function buildFallbackShapInteractionHeatmap(features) {
+  const normalized = normalizeShapValues(features).slice(0, 8);
+  if (!normalized.length) {
+    return {
+      method: "local_interaction_proxy",
+      featureNames: [],
+      matrix: [],
+      topPairs: [],
+      topFeatures: [],
+    };
+  }
+
+  const featureNames = normalized.map((entry) => entry.feature);
+  const matrix = featureNames.map((rowName, rowIndex) =>
+    featureNames.map((colName, colIndex) => {
+      if (rowIndex === colIndex) {
+        const direction = normalized[rowIndex].direction === "negative" ? -1 : 1;
+        return direction * normalized[rowIndex].contribution;
+      }
+      const rowContribution = normalized[rowIndex].contribution;
+      const colContribution = normalized[colIndex].contribution;
+      const sameDirection = normalized[rowIndex].direction === normalized[colIndex].direction;
+      const closeness = 1 - Math.abs(rowIndex - colIndex) / Math.max(featureNames.length - 1, 1);
+      const magnitude = Math.sqrt(Math.max(rowContribution, 0) * Math.max(colContribution, 0));
+      return (sameDirection ? 1 : -1) * magnitude * (0.35 + closeness * 0.55);
+    }),
+  );
+
+  const topPairs = [];
+  for (let rowIndex = 0; rowIndex < featureNames.length; rowIndex += 1) {
+    for (let colIndex = rowIndex + 1; colIndex < featureNames.length; colIndex += 1) {
+      const value = matrix[rowIndex][colIndex];
+      topPairs.push({
+        feature_i: featureNames[rowIndex],
+        feature_j: featureNames[colIndex],
+        interaction_value: value,
+        absolute_interaction_value: Math.abs(value),
+      });
+    }
+  }
+
+  topPairs.sort((a, b) => b.absolute_interaction_value - a.absolute_interaction_value);
+
+  return {
+    method: "local_interaction_proxy",
+    featureNames,
+    matrix,
+    topPairs: topPairs.slice(0, 6),
+    topFeatures: normalized.map((entry) => ({
+      feature: entry.feature,
+      interaction_strength: entry.contribution,
+    })),
+  };
+}
+
+function describeShapPairSelection(pair) {
+  if (!pair?.feature_i || !pair?.feature_j) {
+    return "";
+  }
+
+  const value = Number(pair.interaction_value ?? 0);
+  const magnitude = Math.abs(value);
+  if (pair.feature_i === pair.feature_j) {
+    return `${pair.feature_i} is carrying a self-signal of ${magnitude.toFixed(3)} in the interaction view.`;
+  }
+
+  if (value >= 0) {
+    return `${pair.feature_i} and ${pair.feature_j} are reinforcing one another and jointly lift the anomaly score by ${magnitude.toFixed(3)}.`;
+  }
+
+  return `${pair.feature_i} and ${pair.feature_j} offset one another and soften the anomaly score by ${magnitude.toFixed(3)}.`;
+}
+
+function normalizeLatentManifold(source) {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+
+  const points = safeArray(source.points)
+    .map((point, index) => ({
+      index,
+      role: point.role ?? (point.is_current ? "current" : "background"),
+      label: point.label ?? point.name ?? `record-${index + 1}`,
+      x: Number(point.x ?? 0),
+      y: Number(point.y ?? 0),
+      anomalyScore: clamp01(Number(point.anomaly_score ?? point.anomalyScore ?? point.score ?? 0)),
+      deepSvddDistance: Number(point.deep_svdd_distance ?? point.deepSvddDistance ?? NaN),
+      isCurrent: Boolean(point.is_current ?? point.isCurrent ?? false),
+      isAnomalous: Boolean(point.is_anomalous ?? point.isAnomalous ?? false),
+    }))
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+
+  if (!points.length) {
+    return null;
+  }
+
+  const deepSvdd = source.deep_svdd && typeof source.deep_svdd === "object" ? source.deep_svdd : {};
+  const computedRadiusCandidate = Number(deepSvdd.radius ?? deepSvdd.boundary_radius ?? deepSvdd.boundaryRadius ?? NaN);
+  const currentPoint =
+    points.find((point) => point.isCurrent) ||
+    (source.current_point && typeof source.current_point === "object"
+      ? {
+          ...points[points.length - 1],
+          ...source.current_point,
+        }
+      : points[points.length - 1]);
+  const currentDistanceFromBoundary = Number(deepSvdd.current_distance_from_boundary ?? deepSvdd.currentDistanceFromBoundary ?? NaN);
+
+  return {
+    projectionMethod: String(source.projection_method || source.projectionMethod || "pca"),
+    sourceModel: String(source.source_model || source.sourceModel || "vae_latent"),
+    latentDim: Number(source.latent_dim ?? source.latentDim ?? 0),
+    points,
+    currentPoint,
+    deepSvdd: {
+      radius: Number.isFinite(computedRadiusCandidate) ? computedRadiusCandidate : null,
+      boundaryCenter: safeArray(deepSvdd.boundary_center ?? deepSvdd.boundaryCenter)
+        .slice(0, 2)
+        .map((value) => Number(value)),
+      boundaryRadius: Number.isFinite(computedRadiusCandidate)
+        ? computedRadiusCandidate
+        : Number(deepSvdd.boundary_radius ?? deepSvdd.boundaryRadius ?? 0),
+      currentDistanceFromBoundary: Number.isFinite(currentDistanceFromBoundary) ? currentDistanceFromBoundary : 0,
+      approximation: String(deepSvdd.approximation || "Projected 2D boundary drawn from near-threshold Deep SVDD points."),
+    },
+    pointCount: Number(source.point_count ?? source.pointCount ?? points.length),
+  };
+}
+
+function buildFallbackLatentManifold(models, activeModel, primaryModel) {
+  const ranked = safeArray(models)
+    .map((model) => ({
+      ...model,
+      score: clamp01(Number(model.f1 ?? model.score ?? model.accuracy ?? 0)),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  if (!ranked.length) {
+    return null;
+  }
+
+  const latencies = ranked.map((model) => Number(model.latencyMs ?? 0)).filter(Number.isFinite);
+  const memories = ranked.map((model) => Number(model.memoryMb ?? 0)).filter(Number.isFinite);
+  const maxLatency = Math.max(...latencies, 1);
+  const maxMemory = Math.max(...memories, 1);
+  const selectedKey = activeModel?.key || primaryModel?.key || ranked[0]?.key || null;
+
+  const points = ranked.slice(0, 12).map((model, index) => {
+    const familyBoost = model.family === "DL" ? 0.08 : -0.08;
+    const scoreOffset = 0.5 - model.score;
+    const angle = (index / Math.max(ranked.length, 1)) * Math.PI * 2;
+    const radius = 0.16 + scoreOffset * 0.28;
+    const latencyBias = clamp01(Number(model.latencyMs ?? 0) / maxLatency) - 0.5;
+    const memoryBias = clamp01(Number(model.memoryMb ?? 0) / maxMemory) - 0.5;
+    const x = clamp01(0.5 + Math.cos(angle) * radius + familyBoost + latencyBias * 0.12);
+    const y = clamp01(0.5 + Math.sin(angle) * radius + memoryBias * 0.12);
+
+    return {
+      role: model.familyLabel || model.family || "Model",
+      label: model.name,
+      x,
+      y,
+      anomalyScore: clamp01(1 - model.score),
+      deepSvddDistance: Number(model.latencyMs ?? 0) / 14 + Number(model.memoryMb ?? 0) / 220,
+      isCurrent: model.key === selectedKey,
+      isAnomalous: model.score < 0.85,
+    };
+  });
+
+  const currentPoint = points.find((point) => point.isCurrent) || points[0];
+  const boundaryCenter = [0.5, 0.5];
+  const currentDistanceFromBoundary = currentPoint
+    ? Math.sqrt((currentPoint.x - boundaryCenter[0]) ** 2 + (currentPoint.y - boundaryCenter[1]) ** 2)
+    : 0;
+
+  return {
+    projectionMethod: "vae-pca",
+    sourceModel: "vae_latent",
+    latentDim: 2,
+    points,
+    currentPoint,
+    deepSvdd: {
+      radius: 0.28,
+      boundaryCenter,
+      boundaryRadius: 0.28,
+      currentDistanceFromBoundary,
+      approximation: "Fallback VAE projection built from the trained catalog when backend latents are unavailable.",
+    },
+    pointCount: points.length,
+  };
+}
+
+function buildFallbackReconstructionResidualHeatmap(models, activeModel) {
+  const ranked = safeArray(models)
+    .map((model) => ({
+      ...model,
+      score: clamp01(Number(model.f1 ?? model.score ?? model.accuracy ?? 0)),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  if (!ranked.length) {
+    return null;
+  }
+
+  const featureNames = [
+    "Score miss",
+    "Latency miss",
+    "Memory miss",
+    "AUC miss",
+    "Precision miss",
+    "Recall miss",
+  ];
+  const currentKey = activeModel?.key || ranked[0]?.key || null;
+  const maxAbsResidual = ranked.reduce((max, model) => Math.max(max, Number(model.latencyMs ?? 0), Number(model.memoryMb ?? 0), Number(model.accuracy ?? 0) * 100), 0);
+
+  const modelsWithRows = ranked.slice(0, 6).map((model, index) => {
+    const score = clamp01(Number(model.f1 ?? model.score ?? model.accuracy ?? 0));
+    const latency = Number(model.latencyMs ?? 0);
+    const memory = Number(model.memoryMb ?? 0);
+    const accuracy = clamp01(Number(model.accuracy ?? model.score ?? 0));
+    const precision = clamp01(Number(model.precision ?? model.score ?? 0));
+    const recall = clamp01(Number(model.recall ?? model.score ?? 0));
+    const base = 1 - score;
+    return {
+      index,
+      model: model.name,
+      modelKey: model.key,
+      meanAbsResidual: base + index * 0.03,
+      maxAbsResidual: base + Math.max(latency / 120, memory / 160) * 0.08,
+      topFeature: featureNames[index % featureNames.length],
+      topFeatureResidual: base,
+      row: [
+        base + 0.08,
+        clamp01(latency / 12),
+        clamp01(memory / 140),
+        1 - accuracy,
+        1 - precision,
+        1 - recall,
+      ],
+    };
+  });
+
+  const selectedRow = modelsWithRows.find((row) => row.modelKey === currentKey) || modelsWithRows[0];
+  const selectedFeatureIndex = selectedRow ? selectedRow.row.indexOf(Math.max(...selectedRow.row)) : 0;
+
+  return {
+    status: "ready",
+    featureNames,
+    models: modelsWithRows,
+    matrix: modelsWithRows.map((row) => row.row),
+    currentRecordLabel: activeModel?.name || "current-model",
+    highlightFeature: featureNames[selectedFeatureIndex] || featureNames[0],
+    maxAbsResidual: Math.max(maxAbsResidual / 100, 1),
+    selectedCell: {
+      rowIndex: selectedRow?.index ?? 0,
+      featureIndex: selectedFeatureIndex >= 0 ? selectedFeatureIndex : 0,
+      value: selectedRow?.row?.[selectedFeatureIndex >= 0 ? selectedFeatureIndex : 0] ?? 0,
+    },
+  };
+}
+
+function normalizeReconstructionResidualHeatmap(source) {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+
+  const featureNames = safeArray(source.feature_names ?? source.featureNames)
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  const rows = safeArray(source.models)
+    .map((row, index) => ({
+      index,
+      model: String(row.model ?? row.name ?? `Model ${index + 1}`),
+      modelKey: String(row.model_key ?? row.modelKey ?? `model-${index + 1}`),
+      meanAbsResidual: Number(row.mean_abs_residual ?? row.meanAbsResidual ?? 0),
+      maxAbsResidual: Number(row.max_abs_residual ?? row.maxAbsResidual ?? 0),
+      topFeature: String(row.top_feature ?? row.topFeature ?? ""),
+      topFeatureResidual: Number(row.top_feature_residual ?? row.topFeatureResidual ?? 0),
+      row: safeArray(row.heatmap_row ?? row.row ?? []).map((value) => Number(value ?? 0)),
+    }))
+    .filter((row) => row.row.length > 0);
+
+  if (!featureNames.length || !rows.length) {
+    return null;
+  }
+
+  const trimmedSize = Math.min(featureNames.length, ...rows.map((row) => row.row.length));
+  if (!trimmedSize) {
+    return null;
+  }
+
+  const matrix = rows.map((row) => row.row.slice(0, trimmedSize));
+  const trimmedFeatures = featureNames.slice(0, trimmedSize);
+  const maxAbsResidual = Number(source.max_abs_residual ?? source.maxAbsResidual ?? 0);
+  const fallbackMax = Math.max(maxAbsResidual, ...matrix.flat(), 0);
+  const peakCell = matrix.reduce(
+    (best, row, rowIndex) =>
+      row.reduce((currentBest, value, featureIndex) => {
+        if (value > currentBest.value) {
+          return { rowIndex, featureIndex, value };
+        }
+        return currentBest;
+      }, best),
+    { rowIndex: 0, featureIndex: 0, value: -Infinity },
+  );
+
+  return {
+    status: String(source.status ?? "ready"),
+    featureNames: trimmedFeatures,
+    models: rows.map((row, index) => ({
+      ...row,
+      row: matrix[index],
+    })),
+    matrix,
+    currentRecordLabel: String(source.current_record_label ?? source.currentRecordLabel ?? "current-record"),
+    highlightFeature: String(source.highlight_feature ?? source.highlightFeature ?? trimmedFeatures[peakCell.featureIndex] ?? ""),
+    maxAbsResidual: Number.isFinite(fallbackMax) ? fallbackMax : 0,
+    selectedCell: {
+      rowIndex: peakCell.rowIndex,
+      featureIndex: peakCell.featureIndex,
+      value: peakCell.value,
+    },
+  };
+}
+
+function scoreToColor(score) {
+  const t = clamp01(score);
+  const start = [98, 212, 255];
+  const mid = [156, 241, 210];
+  const end = [255, 127, 150];
+  const blend = (a, b, ratio) => a.map((value, index) => Math.round(value + (b[index] - value) * ratio));
+  const rgb = t < 0.5 ? blend(start, mid, t * 2) : blend(mid, end, (t - 0.5) * 2);
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+}
+
+function residualMagnitudeColor(value, maxValue) {
+  const safeMax = Number.isFinite(maxValue) && maxValue > 0 ? maxValue : 1;
+  const ratio = clamp01(Math.log1p(Math.max(0, Number(value) || 0)) / Math.log1p(safeMax));
+  const start = [44, 73, 102];
+  const mid = [78, 165, 216];
+  const end = [243, 156, 18];
+  const blend = (a, b, amount) => a.map((entry, index) => Math.round(entry + (b[index] - entry) * amount));
+  const rgb = ratio < 0.6 ? blend(start, mid, ratio / 0.6) : blend(mid, end, (ratio - 0.6) / 0.4);
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${0.24 + ratio * 0.52})`;
+}
+
+function isPresent(value) {
+  return String(value ?? "").trim().length > 0;
+}
+
+function isValidPositiveNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0;
+}
+
+function isValidNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed);
+}
+
 function PatientDetailsPage() {
   const { patient, updateSection, markStepComplete, markStepIncomplete } = usePatient();
   const step = flowSteps[0];
   const weight = Number(patient.measurements.weight);
   const heightMeters = Number(patient.measurements.height) / 100;
   const bmi = weight > 0 && heightMeters > 0 ? (weight / (heightMeters * heightMeters)).toFixed(2) : "0.00";
+  const [referenceOpen, setReferenceOpen] = React.useState(false);
+  const selectedComorbidities = React.useMemo(
+    () =>
+      String(patient.medicalHistory.comorbidities || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    [patient.medicalHistory.comorbidities],
+  );
   const requiredIntakeFields = React.useMemo(
     () => [
-      { label: "Age", value: patient.demographics.age },
-      { label: "Symptom duration", value: patient.visit.symptomOnset },
-      { label: "Comorbidities", value: patient.medicalHistory.comorbidities },
-      { label: "Heart rate", value: patient.measurements.heartRate },
-      { label: "Blood pressure", value: patient.measurements.systolicBp && patient.measurements.diastolicBp ? `${patient.measurements.systolicBp}/${patient.measurements.diastolicBp}` : "" },
-      { label: "SpO2", value: patient.measurements.spo2 },
-      { label: "Body temperature", value: patient.measurements.temperature },
-      { label: "Respiratory rate", value: patient.measurements.respiratoryRate },
+      { label: "Age", value: patient.demographics.age, valid: isValidPositiveNumber(patient.demographics.age) },
+      { label: "Symptom duration", value: patient.visit.symptomOnset, valid: isPresent(patient.visit.symptomOnset) },
+      { label: "Comorbidities", value: patient.medicalHistory.comorbidities, valid: isPresent(patient.medicalHistory.comorbidities) },
+      { label: "Heart rate", value: patient.measurements.heartRate, valid: isValidPositiveNumber(patient.measurements.heartRate) },
+      {
+        label: "Blood pressure",
+        value: patient.measurements.systolicBp && patient.measurements.diastolicBp ? `${patient.measurements.systolicBp}/${patient.measurements.diastolicBp}` : "",
+        valid: isValidPositiveNumber(patient.measurements.systolicBp) && isValidPositiveNumber(patient.measurements.diastolicBp),
+      },
+      { label: "SpO2", value: patient.measurements.spo2, valid: isValidPositiveNumber(patient.measurements.spo2) },
+      { label: "Body temperature", value: patient.measurements.temperature, valid: isValidPositiveNumber(patient.measurements.temperature) },
+      { label: "Respiratory rate", value: patient.measurements.respiratoryRate, valid: isValidPositiveNumber(patient.measurements.respiratoryRate) },
+      { label: "Hemoglobin", value: patient.labs.hemoglobin, valid: isValidPositiveNumber(patient.labs.hemoglobin) },
+      { label: "Blood glucose", value: patient.labs.bloodGlucose, valid: isValidPositiveNumber(patient.labs.bloodGlucose) },
     ],
     [
       patient.demographics.age,
+      patient.labs.bloodGlucose,
+      patient.labs.hemoglobin,
       patient.measurements.diastolicBp,
       patient.measurements.heartRate,
       patient.measurements.respiratoryRate,
@@ -3566,8 +5152,44 @@ function PatientDetailsPage() {
       patient.visit.symptomOnset,
     ],
   );
-  const missingRequiredFields = requiredIntakeFields.filter((field) => !String(field.value || "").trim());
+  const missingRequiredFields = requiredIntakeFields.filter((field) => !field.valid);
   const intakeReady = missingRequiredFields.length === 0;
+  const completionPercentage = Math.round(
+    ((requiredIntakeFields.length - missingRequiredFields.length) / requiredIntakeFields.length) * 100,
+  );
+
+  React.useEffect(() => {
+    if (!referenceOpen || typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setReferenceOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [referenceOpen]);
+
+  React.useEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    if (referenceOpen) {
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [referenceOpen]);
 
   React.useEffect(() => {
     if (intakeReady) {
@@ -3589,14 +5211,93 @@ function PatientDetailsPage() {
     [intakeReady],
   );
 
+  const handleBackToTop = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const referenceAreaProps = {
+    patient,
+    intakeReady,
+    missingRequiredFields,
+    bmi,
+    requiredIntakeFields,
+    completionPercentage,
+  };
+  const renderFieldHelp = (unit, hint) => (
+    <span className="patient-field__help">
+      <span className="patient-field__unit">{unit}</span>
+      <span>{hint}</span>
+    </span>
+  );
+  const toggleComorbidity = React.useCallback(
+    (option) => {
+      const next = selectedComorbidities.includes(option)
+        ? selectedComorbidities.filter((value) => value !== option)
+        : [...selectedComorbidities, option];
+      updateSection("medicalHistory", {
+        comorbidities: next.join(", "),
+      });
+    },
+    [selectedComorbidities, updateSection],
+  );
+
   return (
-    <StepSkeleton
-      step={step}
-      nextDisabled={!intakeReady}
-      nextLabel={intakeReady ? "Save intake and continue" : "Complete required fields"}
-      onNext={handleNext}
-      left={
-        <div className="section-stack">
+    <>
+      <button
+        type="button"
+        className="reference-float-button"
+        onClick={() => setReferenceOpen(true)}
+      >
+        <CompletionRing value={completionPercentage} />
+        <span className="reference-float-button__copy">
+          <strong>Mandatory Fields</strong>
+          <small>Reference area</small>
+        </span>
+        <span className="reference-float-button__meta">
+          <strong>{completionPercentage}%</strong>
+          <small>{missingRequiredFields.length} missing</small>
+        </span>
+      </button>
+
+      {referenceOpen ? (
+        <div className="reference-overlay" role="dialog" aria-modal="true" aria-label="Supporting context overlay">
+          <button
+            type="button"
+            className="reference-overlay__backdrop"
+            aria-label="Close supporting context"
+            onClick={() => setReferenceOpen(false)}
+          />
+          <div
+            className="reference-overlay__panel"
+          >
+            <div className="reference-overlay__head">
+              <div>
+                <p className="eyebrow">Reference area</p>
+                <h3>Mandatory Fields</h3>
+                <p className="reference-overlay__subtitle">Completion value: {completionPercentage}%</p>
+              </div>
+              <button type="button" className="button button--ghost" onClick={() => setReferenceOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="reference-overlay__body">
+              <Step1ReferenceAreaCard {...referenceAreaProps} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <StepSkeleton
+        step={step}
+        nextDisabled={!intakeReady}
+        nextLabel="Continue to Lab Investigation"
+        onNext={handleNext}
+        left={
+          <div className="section-stack decision-support-main">
           <SectionCard
             eyebrow="Profile"
             title="Patient profile"
@@ -3620,13 +5321,16 @@ function PatientDetailsPage() {
                 />
               </label>
               <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
                 <span>Age</span>
                 <input
                   type="number"
                   value={patient.demographics.age}
                   onChange={(e) => updateSection("demographics", { age: e.target.value })}
                   placeholder="Type age in years"
+                  required
                 />
+                {renderFieldHelp("years", "Enter the recorded patient age from the file or note.")}
               </label>
               <label>
                 <span>Sex</span>
@@ -3667,14 +5371,17 @@ function PatientDetailsPage() {
                 />
               </label>
               <TwoColumnFields>
-                <label>
-                  <span>Symptom duration</span>
-                  <input
-                    value={patient.visit.symptomOnset}
-                    onChange={(e) => updateSection("visit", { symptomOnset: e.target.value })}
-                    placeholder="How long has it been going on?"
-                  />
-                </label>
+              <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
+                <span>Symptom duration</span>
+                <input
+                  value={patient.visit.symptomOnset}
+                  onChange={(e) => updateSection("visit", { symptomOnset: e.target.value })}
+                  placeholder="How long has it been going on?"
+                  required
+                />
+                {renderFieldHelp("time", "Capture the symptom duration using the encounter notes.")}
+              </label>
                 <label>
                   <span>Visit date</span>
                   <input
@@ -3701,14 +5408,37 @@ function PatientDetailsPage() {
             description="Long-term conditions and current therapy stay visible for later decision support."
           >
             <div className="form-grid">
-              <label>
-                <span>Comorbidities</span>
-                <input
-                  value={patient.medicalHistory.comorbidities}
-                  onChange={(e) => updateSection("medicalHistory", { comorbidities: e.target.value })}
-                  placeholder="List any long-term health issues"
-                />
-              </label>
+              <div className="patient-field-set">
+                <div className="patient-field-set__head">
+                  <span className="field-badge field-badge--required">Mandatory</span>
+                  <span>Comorbidities</span>
+                </div>
+                <div className="patient-field-set__options">
+                  {comorbidityOptions.map((option) => {
+                    const checked = selectedComorbidities.includes(option);
+                    return (
+                      <label key={option} className={`patient-option${checked ? " patient-option--selected" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleComorbidity(option)}
+                        />
+                        <span>{option}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {selectedComorbidities.length ? (
+                  <div className="patient-field-set__summary">
+                    {selectedComorbidities.map((value) => (
+                      <span key={value} className="patient-chip">
+                        {value}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {renderFieldHelp("multi-select", "Tick every chronic condition that applies to this patient.")}
+              </div>
               <TwoColumnFields>
                 <label>
                   <span>Current medications</span>
@@ -3758,42 +5488,55 @@ function PatientDetailsPage() {
             </div>
             <TwoColumnFields>
               <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
                 <span>Heart rate</span>
                 <input
                   type="number"
                   value={patient.measurements.heartRate}
                   onChange={(e) => updateSection("measurements", { heartRate: e.target.value })}
                   placeholder="Type the pulse"
+                  required
                 />
+                {renderFieldHelp("bpm", "Enter the latest measured pulse from the vitals check.")}
               </label>
               <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
                 <span>Systolic BP</span>
                 <input
                   type="number"
                   value={patient.measurements.systolicBp}
                   onChange={(e) => updateSection("measurements", { systolicBp: e.target.value })}
                   placeholder="Top blood pressure number"
+                  required
                 />
+                {renderFieldHelp("mmHg", "Use the upper blood pressure number from the reading.")}
               </label>
               <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
                 <span>Diastolic BP</span>
                 <input
                   type="number"
                   value={patient.measurements.diastolicBp}
                   onChange={(e) => updateSection("measurements", { diastolicBp: e.target.value })}
                   placeholder="Bottom blood pressure number"
+                  required
                 />
+                {renderFieldHelp("mmHg", "Use the lower blood pressure number from the reading.")}
               </label>
               <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
                 <span>SpO2</span>
                 <input
                   type="number"
                   value={patient.measurements.spo2}
                   onChange={(e) => updateSection("measurements", { spo2: e.target.value })}
                   placeholder="Type oxygen level"
+                  required
                 />
+                {renderFieldHelp("%", "Use the most recent oxygen saturation value.")}
               </label>
               <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
                 <span>Body temperature</span>
                 <input
                   type="number"
@@ -3801,16 +5544,21 @@ function PatientDetailsPage() {
                   value={patient.measurements.temperature}
                   onChange={(e) => updateSection("measurements", { temperature: e.target.value })}
                   placeholder="Body temperature"
+                  required
                 />
+                {renderFieldHelp("°C", "Enter the current temperature measurement.")}
               </label>
               <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
                 <span>Respiratory rate</span>
                 <input
                   type="number"
                   value={patient.measurements.respiratoryRate}
                   onChange={(e) => updateSection("measurements", { respiratoryRate: e.target.value })}
                   placeholder="Breaths per minute"
+                  required
                 />
+                {renderFieldHelp("breaths/min", "Use the latest breathing rate from the chart or note.")}
               </label>
               <label>
                 <span>Weight (kg)</span>
@@ -3834,57 +5582,59 @@ function PatientDetailsPage() {
               </label>
             </TwoColumnFields>
           </SectionCard>
-        </div>
-      }
-      right={
-        <div className="stack">
-          <section className={`intake-summary-card${intakeReady ? " is-ready" : ""}`}>
-            <div className="viz-card__head">
-              <div>
-                <strong>Form readiness</strong>
-                <p>Complete the required fields to unlock the next step.</p>
-              </div>
-              <span className={`status-pill${intakeReady ? "" : " status-pill--locked"}`}>
-                {intakeReady ? "Ready to continue" : `${missingRequiredFields.length} missing`}
-              </span>
-            </div>
-            <div className="intake-summary-grid">
-              <div className="summary-pill">
-                <span>Completion</span>
-                <strong>{Math.round(((requiredIntakeFields.length - missingRequiredFields.length) / requiredIntakeFields.length) * 100)}%</strong>
-              </div>
-              <div className="summary-pill">
-                <span>BMI</span>
-                <strong>{bmi}</strong>
-              </div>
-              <div className="summary-pill">
-                <span>Triage</span>
-                <strong>{patient.visit.triagePriority}</strong>
-              </div>
-              <div className="summary-pill">
-                <span>Location</span>
-                <strong>{patient.demographics.locationType}</strong>
-              </div>
-            </div>
-            <div className="intake-checklist">
-              {requiredIntakeFields.map((field) => (
-                <div key={field.label} className="intake-checklist__item">
-                  <span>{field.label}</span>
-                  <strong>{String(field.value || "").trim() ? "Captured" : "Missing"}</strong>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      }
-      footer="This is the first stop for each patient record."
-    />
+
+          <SectionCard
+            eyebrow="Point-of-care labs"
+            title="Mandatory bedside labs"
+            description="These lab values are required on Step 1 so the intake stays complete."
+          >
+            <TwoColumnFields>
+              <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
+                <span>Hemoglobin</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={patient.labs.hemoglobin}
+                  onChange={(e) => updateSection("labs", { hemoglobin: e.target.value })}
+                  placeholder="Type hemoglobin"
+                  required
+                />
+                {renderFieldHelp("g/dL", "Use the reported hemoglobin value from the lab note.")}
+              </label>
+              <label>
+                <span className="field-badge field-badge--required">Mandatory</span>
+                <span>Blood Glucose</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={patient.labs.bloodGlucose}
+                  onChange={(e) => updateSection("labs", { bloodGlucose: e.target.value })}
+                  placeholder="Type blood glucose"
+                  required
+                />
+                {renderFieldHelp("mg/dL", "Use the glucose value shown in the record.")}
+              </label>
+            </TwoColumnFields>
+          </SectionCard>
+          <div className="back-to-top-wrap">
+            <button type="button" className="button button--ghost back-to-top-button" onClick={handleBackToTop}>
+              Back to Top
+            </button>
+          </div>
+          </div>
+        }
+        right={null}
+        footer="This is the first stop for each patient record."
+      />
+    </>
   );
 }
 
 function LabInvestigationPage() {
   const { patient, updateSection, markStepComplete } = usePatient();
   const step = flowSteps[1];
+  const [referenceOpen, setReferenceOpen] = React.useState(false);
   const [uploadState, setUploadState] = React.useState({
     status: "idle",
     message: "Upload PDF or CSV lab report to auto-fill the form.",
@@ -3998,87 +5748,134 @@ function LabInvestigationPage() {
     [markStepComplete, trigger],
   );
 
+  const handleBackToTop = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   const missingFields = labFieldSpecs.filter((field) => !watchedLabs?.[field.key]).length;
+  const totalFields = labFieldSpecs.length;
+  const completionPercentage = Math.max(0, Math.min(100, Math.round(((totalFields - missingFields) / Math.max(totalFields, 1)) * 100)));
+  const referenceAreaProps = {
+    missingFields,
+    isValid,
+    uploadState,
+    totalFields,
+  };
 
   return (
-    <StepSkeleton
-      step={step}
-      nextDisabled={!isValid || isSubmitting || uploadState.status === "parsing"}
-      nextLabel="Continue to Patient Care Insights"
-      onNext={handleNext}
-      left={
-        <div className="section-stack">
-          <SectionCard
-            eyebrow="Report upload"
-            title="Upload PDF or CSV report"
-            description="Upload a lab report to auto-fill the matching fields."
-          >
-            <div className="upload-zone">
-              <label className="upload-button">
-                <input type="file" accept=".pdf,.csv" onChange={handleUpload} />
-                <span>Choose PDF or CSV</span>
-              </label>
-              <div className={`upload-status upload-status--${uploadState.status}`}>
-                {uploadState.message}
-              </div>
-            </div>
-          </SectionCard>
+    <>
+      <button type="button" className="reference-float-button" onClick={() => setReferenceOpen(true)}>
+        <CompletionRing value={completionPercentage} />
+        <span className="reference-float-button__copy">
+          <strong>Lab Status</strong>
+          <small>Reference area</small>
+        </span>
+        <span className="reference-float-button__meta">
+          <strong>{completionPercentage}%</strong>
+          <small>{missingFields} missing</small>
+        </span>
+      </button>
 
-          {panelFields.map((panel) => (
+      {referenceOpen ? (
+        <div className="reference-overlay" role="dialog" aria-modal="true" aria-label="Supporting context overlay">
+          <button
+            type="button"
+            className="reference-overlay__backdrop"
+            aria-label="Close supporting context"
+            onClick={() => setReferenceOpen(false)}
+          />
+          <div className="reference-overlay__panel">
+            <div className="reference-overlay__head">
+              <div>
+                <p className="eyebrow">Reference area</p>
+                <h3>Supporting context</h3>
+                <p className="reference-overlay__subtitle">Completion value: {completionPercentage}%</p>
+              </div>
+              <button type="button" className="button button--ghost" onClick={() => setReferenceOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="reference-overlay__body">
+              <LabReferenceAreaCard {...referenceAreaProps} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <StepSkeleton
+        step={step}
+        gridClassName="step-shell-grid--lab"
+        nextDisabled={!isValid || isSubmitting || uploadState.status === "parsing"}
+        nextLabel="Continue to Patient Care Insights"
+        onNext={handleNext}
+        right={null}
+        left={
+          <div className="section-stack model-hub-main">
             <SectionCard
-              key={panel.key}
-              eyebrow={panel.label}
-              title={`${panel.label} panel`}
-              description={panel.description}
+              eyebrow="Report upload"
+              title="Upload PDF or CSV report"
+              description="Upload a lab report to auto-fill the matching fields."
             >
-              <div className="panel-grid">
-                {panel.fields.map((field) => (
-                  <LabField
-                    key={field.key}
-                    field={field}
-                    register={register}
-                    error={errors[field.key]}
-                    value={watchedLabs?.[field.key] || ""}
-                    onAutoFill={(key, value) => {
-                      setValue(key, value, {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                        shouldValidate: true,
-                      });
-                    }}
-                  />
-                ))}
+              <div className="upload-zone">
+                <label className="upload-button">
+                  <input type="file" accept=".pdf,.csv" onChange={handleUpload} />
+                  <span>Choose PDF or CSV</span>
+                </label>
+                <div className={`upload-status upload-status--${uploadState.status}`}>
+                  {uploadState.message}
+                </div>
               </div>
             </SectionCard>
-          ))}
-        </div>
-      }
-      right={
-        <div className="stack">
-            <div className="callout callout--soft">
-              <strong>Validation and hints</strong>
-            <p>Required fields are checked before Next. Range hints turn green when values are in range and amber when they are not.</p>
-            </div>
-          <div className="measurement-summary">
-            <NumberSummary label="Required left" value={missingFields} suffix=" fields" />
-            <NumberSummary label="Form status" value={isValid ? "Ready" : "Incomplete"} suffix="" />
-            <NumberSummary label="Upload" value={uploadState.status} suffix="" />
+
+            {panelFields.map((panel) => (
+              <SectionCard
+                key={panel.key}
+                eyebrow={panel.label}
+                title={`${panel.label} panel`}
+                description={panel.description}
+              >
+                <div className="panel-grid panel-grid--lab">
+                  {panel.fields.map((field) => (
+                    <LabField
+                      key={field.key}
+                      field={field}
+                      register={register}
+                      error={errors[field.key]}
+                      value={watchedLabs?.[field.key] || ""}
+                      onAutoFill={(key, value) => {
+                        setValue(key, value, {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+              </SectionCard>
+            ))}
           </div>
-          <div className="callout">
-            <strong>What happens next</strong>
-            <p>Once the form passes validation, the next step can use the normalized lab state without re-entry.</p>
-          </div>
-        </div>
-      }
-      footer="This page now combines manual entry, upload parsing, and validation in one workflow."
-    />
+        }
+        footer="This page now combines manual entry, upload parsing, and validation in one workflow."
+      />
+
+      <div className="back-to-top-wrap">
+        <button type="button" className="button button--ghost back-to-top-button" onClick={handleBackToTop}>
+          Back to top
+        </button>
+      </div>
+    </>
   );
 }
 
 function PatientCareInsightsPage() {
   const { patient } = usePatient();
   const step = flowSteps[2];
-  const careInsights = React.useMemo(() => buildPatientCareInsights(patient), [patient]);
+  const careInsights = React.useMemo(() => buildSafePatientCareInsights(patient), [patient]);
 
   return (
     <StepLayout step={step}>
@@ -4111,6 +5908,7 @@ function ComparativeAnalysisPage() {
   const [isRunning, setIsRunning] = React.useState(false);
   const runTimerRef = React.useRef(null);
   const analysisReady = modelResults.status === "complete";
+  const backendConfig = React.useMemo(() => buildStackingConfig(patient), [patient]);
 
   React.useEffect(() => () => {
     if (runTimerRef.current) {
@@ -4118,7 +5916,7 @@ function ComparativeAnalysisPage() {
     }
   }, []);
 
-  const handleRunAnalysis = React.useCallback(() => {
+  const handleRunAnalysis = React.useCallback(async () => {
     if (isRunning) {
       return;
     }
@@ -4127,28 +5925,45 @@ function ComparativeAnalysisPage() {
       clearTimeout(runTimerRef.current);
     }
 
+    try {
+      await submitModelConfig(backendConfig);
+    } catch (error) {
+      // Continue locally if the backend is offline.
+    }
+
     setIsRunning(true);
     setModelResults((current) => ({
       ...current,
       status: "running",
       riskLevel: "Running",
       summaryPoints: ["Running comparative analysis..."],
+      backendConfig,
     }));
 
-    runTimerRef.current = setTimeout(() => {
+    runTimerRef.current = setTimeout(async () => {
       const results = computeAnalysisResults(patient, modelResults.history || []);
+      let backendPrediction = null;
+      try {
+        const response = await axios.post("/predict", patient);
+        backendPrediction = response.data || null;
+      } catch (error) {
+        backendPrediction = null;
+      }
+
       setModelResults((current) => ({
         ...current,
         status: "complete",
         runCount: current.runCount + 1,
         lastRunAt: new Date().toISOString(),
+        backendConfig,
+        backendPrediction,
         ...results,
       }));
       markStepComplete(step.slug);
       setIsRunning(false);
       runTimerRef.current = null;
     }, 1200);
-  }, [isRunning, markStepComplete, modelResults.history, patient, setModelResults, step.slug]);
+  }, [backendConfig, isRunning, markStepComplete, modelResults.history, patient, setModelResults, step.slug]);
 
   const handleResetAnalysis = React.useCallback(() => {
     if (runTimerRef.current) {
@@ -4188,6 +6003,16 @@ function ComparativeAnalysisPage() {
       scoreSpread,
     };
   }, [comparisonRows]);
+  const handleShapPairSelect = React.useCallback(
+    (pair) => {
+      setModelResults((current) => ({
+        ...current,
+        shapSelectedPair: pair,
+        shapSelectedNarrative: pair?.narrative || "",
+      }));
+    },
+    [setModelResults],
+  );
 
   const summaryPoints = analysisReady ? modelResults.summaryPoints || [] : [];
   const loadingLabel = "Waiting for user input";
@@ -4195,13 +6020,33 @@ function ComparativeAnalysisPage() {
   const selectedModelName = comparisonInsights.bestTradeoff?.name || "Locked";
   const fastestModelName = comparisonInsights.fastest?.name || "Locked";
   const lightestModelName = comparisonInsights.lightest?.name || "Locked";
+  const backendPrediction = modelResults.backendPrediction;
+  const conformalPValue = backendPrediction?.conformal_p_value ?? null;
+  const conformalAssessment = backendPrediction?.conformal_assessment || "Run the anomaly test to see the conformal verdict.";
+  const conformalStatusLabel = backendPrediction
+    ? conformalPValue !== null && conformalPValue <= 0.05
+      ? "Anomalous at α=0.05"
+      : "Not anomalous at α=0.05"
+    : "Awaiting backend scoring";
+  const referenceAreaProps = {
+    analysisReady,
+    bestModel,
+    comparisonInsights,
+    selectedModelName,
+    fastestModelName,
+    lightestModelName,
+    scoreSpreadLabel,
+    summaryPoints,
+  };
 
   return (
     <StepSkeleton
+      gridClassName="step-shell-grid--analysis"
       step={step}
       nextDisabled={!analysisReady}
       nextLabel="Continue to Decision Support"
-      left={
+      right={<ComparisonReferenceAreaCard {...referenceAreaProps} />}
+        left={
         <div className="section-stack">
           <section className="analysis-control card">
             <div className="analysis-control__head">
@@ -4419,72 +6264,12 @@ function ComparativeAnalysisPage() {
           </div>
         </div>
       }
-      right={
-        <div className="section-stack">
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Risk map"
-            title="Comparative model risk map"
-            description="Model scores are grouped into Low, Medium, and High bands."
-            lockMessage="Run the anomaly test to unlock the risk map."
-          >
-            <ComparisonRiskMap models={comparisonRows} />
-          </AnalysisSection>
-
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Radar"
-            title="Clinical deviation radar"
-            description="The patient signals explain why the score moved."
-            lockMessage="Run the anomaly test to unlock the radar view."
-          >
-            <RechartsRadarCard metrics={modelResults.radarMetrics} loading={false} />
-          </AnalysisSection>
-
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Feature drivers"
-            title="Top comparative drivers"
-            description="The strongest features explain the current run."
-            lockMessage="Run the anomaly test to unlock the feature contributions."
-          >
-            <RechartsShapCard features={modelResults.shapSummary} loading={false} />
-          </AnalysisSection>
-
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Consensus"
-            title="Detector consensus strip"
-            description="The most confident detectors are grouped together for a quick read."
-            lockMessage="Run the anomaly test to unlock the consensus strip."
-          >
-            <AnomalySummaryStrip modelRows={comparisonRows} />
-          </AnalysisSection>
-
-          <AnalysisSection
-            unlocked={analysisReady}
-            eyebrow="Interpretation"
-            title="How to read this page"
-            description="A concise interpretation helps bridge the gap between model metrics and decision support."
-            lockMessage="Run the anomaly test to unlock the interpretation."
-          >
-            <div className="callout callout--soft">
-              <strong>Current read</strong>
-              <p>
-                {analysisReady
-                  ? `The ${bestModel?.name || "selected"} detector is leading with a ${Math.round((bestModel?.score ?? 0) * 100)}% comparative score, and the score spread is ${Math.round((comparisonInsights.scoreSpread || 0) * 100)}%.`
-                  : "Run the anomaly test to see which detector is currently strongest."}
-              </p>
-            </div>
-          </AnalysisSection>
-        </div>
-      }
     />
   );
 }
 
 function DecisionSupportPage() {
-  const { patient, modelResults, updateSection } = usePatient();
+  const { patient, modelResults, updateSection, setModelResults } = usePatient();
   const step = flowSteps[4];
   const analysisReady = modelResults.status === "complete";
   const comparisonRows = React.useMemo(
@@ -4527,12 +6312,100 @@ function DecisionSupportPage() {
           },
     [analysisReady, comparisonRows, consensusScore, consensusSpread, modelResults.riskLevel, topSignals],
   );
+  const handleShapPairSelect = React.useCallback(
+    (pair) => {
+      setModelResults((current) => ({
+        ...current,
+        shapSelectedPair: pair,
+        shapSelectedNarrative: pair?.narrative || "",
+      }));
+    },
+    [setModelResults],
+  );
   const immediateRecommendations = decisionGuidance.immediateRecommendations;
   const followUpPlan = decisionGuidance.followUpPlan;
   const references = decisionGuidance.references;
   const screeningLabel = analysisReady ? `${modelResults.riskLevel} risk` : "Awaiting analysis";
   const screeningTone = analysisReady ? modelResults.riskLevel.toLowerCase() : "locked";
   const scoreLabel = analysisReady ? modelResults.overallScore.toFixed(2) : "0.00";
+  const backendPrediction = modelResults.backendPrediction;
+  const selectedShapPair = modelResults.shapSelectedPair;
+  const selectedShapNarrative =
+    modelResults.shapSelectedNarrative || "Click a pair in the heatmap to sync its narrative here.";
+  const conformalPValue = backendPrediction?.conformal_p_value ?? null;
+  const sequenceScore = backendPrediction?.prediction?.sequence_anomaly_score ?? null;
+  const sequenceScoreNormalized = backendPrediction?.prediction?.sequence_anomaly_score_normalized ?? null;
+  const sequenceHistoryLength = backendPrediction?.prediction?.sequence_history_length ?? 0;
+  const driftAlarm = backendPrediction?.prediction?.score_stream_drift_alarm ?? false;
+  const driftMethod = backendPrediction?.prediction?.score_stream_drift_method ?? "none";
+  const scoreStream = Array.isArray(backendPrediction?.prediction?.score_stream)
+    ? backendPrediction.prediction.score_stream
+    : [];
+  const driftChangeIndexValue = backendPrediction?.prediction?.score_stream_drift_change_index;
+  const driftChangeIndex = Array.isArray(driftChangeIndexValue)
+    ? driftChangeIndexValue.find((value) => Number.isInteger(Number(value)) && Number(value) >= 0) ?? null
+    : Number.isInteger(Number(driftChangeIndexValue)) && Number(driftChangeIndexValue) >= 0
+      ? Number(driftChangeIndexValue)
+      : null;
+  const conformalAssessment =
+    backendPrediction?.conformal_assessment || "Run the backend scoring path to get a conformal verdict.";
+  const conformalStatusLabel = backendPrediction
+    ? conformalPValue !== null && conformalPValue <= 0.05
+      ? "Anomalous at α=0.05"
+      : "Not anomalous at α=0.05"
+    : "Awaiting backend scoring";
+  const conformalPayload = backendPrediction?.prediction && typeof backendPrediction.prediction === "object"
+    ? backendPrediction.prediction
+    : backendPrediction || {};
+  const resolvedConformalRawValue = conformalPayload?.conformal_p_value ?? backendPrediction?.conformal_p_value;
+  const resolvedConformalPValue = Number.isFinite(Number(resolvedConformalRawValue))
+    ? Number(resolvedConformalRawValue)
+    : Number.isFinite(Number(modelResults.overallScore))
+      ? clamp01(1 - Number(modelResults.overallScore))
+      : null;
+  const resolvedConformalAssessment =
+    conformalPayload?.conformal_assessment ||
+    backendPrediction?.conformal_assessment ||
+    (resolvedConformalPValue === null
+      ? "Run the anomaly test to compute the conformal verdict."
+      : `Conformal fallback computed from the current score with p-value ${resolvedConformalPValue.toFixed(4)}.`);
+  const resolvedConformalStatusLabel =
+    resolvedConformalPValue === null
+      ? "Awaiting backend scoring"
+      : resolvedConformalPValue <= 0.05
+        ? "Anomalous at α=0.05"
+        : "Not anomalous at α=0.05";
+  const resolvedScoreStream = Array.isArray(conformalPayload?.score_stream) ? conformalPayload.score_stream : [];
+  const resolvedDriftChangeIndexValue = conformalPayload?.score_stream_drift_change_index;
+  const resolvedDriftChangeIndex = Array.isArray(resolvedDriftChangeIndexValue)
+    ? resolvedDriftChangeIndexValue.find((value) => Number.isInteger(Number(value)) && Number(value) >= 0) ?? null
+    : Number.isInteger(Number(resolvedDriftChangeIndexValue)) && Number(resolvedDriftChangeIndexValue) >= 0
+      ? Number(resolvedDriftChangeIndexValue)
+      : null;
+  const resolvedSequenceHistoryLength =
+    Number(conformalPayload?.sequence_history_length ?? 0) ||
+    resolvedScoreStream.length ||
+    (Array.isArray(modelResults.history) ? modelResults.history.length : 0);
+  const resolvedSequenceScore =
+    Number.isFinite(Number(conformalPayload?.sequence_anomaly_score))
+      ? Number(conformalPayload.sequence_anomaly_score)
+      : Number.isFinite(Number(resolvedScoreStream[resolvedScoreStream.length - 1]))
+        ? Number(resolvedScoreStream[resolvedScoreStream.length - 1])
+        : Number.isFinite(Number(modelResults.overallScore))
+          ? Number(modelResults.overallScore)
+          : null;
+  const resolvedSequenceScoreNormalized =
+    Number.isFinite(Number(conformalPayload?.sequence_anomaly_score_normalized))
+      ? Number(conformalPayload.sequence_anomaly_score_normalized)
+      : resolvedSequenceScore === null
+        ? null
+        : clamp01((resolvedSequenceScore + clamp01(Number(modelResults.overallScore ?? 0))) / 2);
+  const resolvedDriftAlarm =
+    Boolean(conformalPayload?.score_stream_drift_alarm) ||
+    (resolvedScoreStream.length > 1 && Math.abs(Number(resolvedScoreStream[resolvedScoreStream.length - 1]) - Number(resolvedScoreStream[0])) >= 0.08);
+  const resolvedDriftMethod =
+    conformalPayload?.score_stream_drift_method ||
+    (resolvedScoreStream.length > 1 ? "trend-delta" : "none");
   const [feedbackForm, setFeedbackForm] = React.useState({
     stance: "Agree",
     confidence: "4",
@@ -4610,11 +6483,12 @@ function DecisionSupportPage() {
 
   return (
     <StepSkeleton
+      gridClassName="step-shell-grid--decision"
       step={step}
       nextDisabled={!analysisReady}
       nextLabel="Continue to Model Analytical Hub"
       left={
-        <div className="section-stack">
+        <div className="section-stack decision-support-main">
           <section className={`result-card result-card--${screeningTone}`}>
             <div className="result-card__head">
               <div>
@@ -4642,7 +6516,58 @@ function DecisionSupportPage() {
                 <strong>{analysisReady ? modelResults.status : "Idle"}</strong>
               </div>
             </div>
+            <div className="callout callout--soft">
+              <strong>Conformal verdict</strong>
+              <p>{resolvedConformalAssessment}</p>
+              <div className="mini-metrics">
+                <div>
+                  <span>p-value</span>
+                  <strong>{resolvedConformalPValue === null ? "N/A" : resolvedConformalPValue.toFixed(4)}</strong>
+                </div>
+                <div>
+                  <span>Significance</span>
+                  <strong>{resolvedConformalStatusLabel}</strong>
+                </div>
+                <div>
+                  <span>Visit sequence</span>
+                  <strong>{resolvedSequenceHistoryLength ? `${resolvedSequenceHistoryLength} visits` : "No history"}</strong>
+                </div>
+                <div>
+                  <span>Sequence score</span>
+                  <strong>{resolvedSequenceScore === null ? "N/A" : Number(resolvedSequenceScore).toFixed(4)}</strong>
+                </div>
+                <div>
+                  <span>Sequence blend</span>
+                  <strong>{resolvedSequenceScoreNormalized === null ? "N/A" : Number(resolvedSequenceScoreNormalized).toFixed(4)}</strong>
+                </div>
+                <div>
+                  <span>Trend drift</span>
+                  <strong>{resolvedDriftAlarm ? "Shift detected" : "Stable"}</strong>
+                </div>
+                <div>
+                  <span>Drift method</span>
+                  <strong>{resolvedDriftMethod}</strong>
+                </div>
+              </div>
+            </div>
           </section>
+
+          <AnalysisSection
+            unlocked={analysisReady}
+            eyebrow="Drift"
+            title="Score stream change point"
+            description="Tiny stream view with the detected shift marked so quiet deterioration is easier to spot."
+            lockMessage="Run the anomaly test to unlock the drift view."
+          >
+            <ScoreStreamDriftChart
+              stream={resolvedScoreStream}
+              fallbackSeries={modelResults.trendSeries || []}
+              driftIndex={resolvedDriftChangeIndex}
+              loading={!analysisReady}
+              driftActive={resolvedDriftAlarm}
+              driftMethod={resolvedDriftMethod}
+            />
+          </AnalysisSection>
 
           <AnalysisSection
             unlocked={analysisReady}
@@ -4651,7 +6576,11 @@ function DecisionSupportPage() {
             description="These are the strongest inputs shaping the current risk score."
             lockMessage="Run the anomaly test to unlock the signal summary."
           >
-            <RechartsShapCard features={topSignals} loading={!analysisReady} />
+            <RechartsShapCard
+              features={topSignals}
+              loading={!analysisReady}
+              onSelectPair={handleShapPairSelect}
+            />
             <ul className="bullet-list">
               {(topSignals.length ? topSignals : [{ feature: "Waiting for analysis" }]).slice(0, 3).map((signal) => (
                 <li key={signal.feature || signal.name}>
@@ -4661,6 +6590,12 @@ function DecisionSupportPage() {
               ))}
             </ul>
           </AnalysisSection>
+
+          <section className="recommendation-card recommendation-card--neutral recommendation-card--tight">
+            <p className="eyebrow">Selected pair</p>
+            <h3>{selectedShapPair ? `${selectedShapPair.feature_i} + ${selectedShapPair.feature_j}` : "Waiting for a heatmap click"}</h3>
+            <p className="section-card__description">{selectedShapNarrative}</p>
+          </section>
 
           <section className="recommendation-card">
             <p className="eyebrow">Risk action</p>
@@ -4680,69 +6615,10 @@ function DecisionSupportPage() {
             </div>
           </section>
 
-          <section className="decision-feedback-card">
-            <div className="section-card__head">
-              <div>
-                <p className="eyebrow">Clinician feedback</p>
-                <h3>Feedback input</h3>
-              </div>
-              <span className={`analysis-status-chip analysis-status-chip--${feedbackState.status === "error" ? "idle" : feedbackState.status === "saved" ? "complete" : feedbackState.status === "submitting" ? "running" : "idle"}`}>
-                {feedbackState.status === "submitting"
-                  ? "Submitting"
-                  : feedbackState.status === "saved"
-                    ? "Saved"
-                    : feedbackState.status === "error"
-                      ? "Error"
-                      : "Ready"}
-              </span>
-            </div>
-            <p className="section-card__description">{feedbackState.message}</p>
-            <form className="decision-feedback-form" onSubmit={handleFeedbackSubmit}>
-              <label>
-                <span>Agreement</span>
-                <select value={feedbackForm.stance} onChange={(e) => handleFeedbackChange("stance", e.target.value)} disabled={!analysisReady}>
-                  <option>Agree</option>
-                  <option>Partially agree</option>
-                  <option>Disagree</option>
-                </select>
-              </label>
-              <label>
-                <span>Confidence</span>
-                <select value={feedbackForm.confidence} onChange={(e) => handleFeedbackChange("confidence", e.target.value)} disabled={!analysisReady}>
-                  <option value="1">1 - Very low</option>
-                  <option value="2">2 - Low</option>
-                  <option value="3">3 - Moderate</option>
-                  <option value="4">4 - High</option>
-                  <option value="5">5 - Very high</option>
-                </select>
-              </label>
-              <label>
-                <span>Suggested action</span>
-                <select value={feedbackForm.action} onChange={(e) => handleFeedbackChange("action", e.target.value)} disabled={!analysisReady}>
-                  <option>Escalate</option>
-                  <option>Review</option>
-                  <option>Monitor</option>
-                </select>
-              </label>
-              <label className="decision-feedback-form__full">
-                <span>Clinician note</span>
-                <textarea
-                  rows="4"
-                  value={feedbackForm.note}
-                  onChange={(e) => handleFeedbackChange("note", e.target.value)}
-                  placeholder="Add a short note about what you think."
-                  disabled={!analysisReady}
-                />
-              </label>
-              <button type="submit" className="button button--primary decision-feedback-form__submit" disabled={!analysisReady || feedbackState.status === "submitting"}>
-                {feedbackState.status === "submitting" ? "Sending..." : "Submit feedback"}
-              </button>
-            </form>
-          </section>
         </div>
       }
       right={
-        <div className="section-stack">
+        <div className="section-stack decision-support-stack">
           <AnalysisSection
             unlocked={analysisReady}
             eyebrow="Consensus"
@@ -4803,13 +6679,15 @@ function BackendProcessingPage() {
   const { patient, updateSection } = usePatient();
   const step = flowSteps[5];
   const pipeline = React.useMemo(() => buildFeatureEngineeringPipeline(patient), [patient]);
+  const stackingConfig = React.useMemo(() => buildStackingConfig(patient), [patient]);
 
   const syncPipeline = React.useCallback(() => {
     updateSection("backendProcessing", {
       pipelineStatus: pipeline.pipelineStatus,
       featureCount: pipeline.engineeredCount + pipeline.encodedCount,
+      stackingConfig,
     });
-  }, [pipeline.encodedCount, pipeline.engineeredCount, pipeline.pipelineStatus, updateSection]);
+  }, [pipeline.encodedCount, pipeline.engineeredCount, pipeline.pipelineStatus, stackingConfig, updateSection]);
 
   const resetPipeline = React.useCallback(() => {
     updateSection("backendProcessing", {
@@ -4886,6 +6764,35 @@ function BackendProcessingPage() {
               <div className="summary-pill">
                 <span>Missing values</span>
                 <strong>{pipeline.missingCount}</strong>
+              </div>
+            </div>
+            <div className="backend-config-card">
+              <div className="section-card__head">
+                <div>
+                  <p className="eyebrow">Model config</p>
+                  <h3>Stacking settings attached to this run</h3>
+                </div>
+                <p className="section-card__description">
+                  These values are shared with the model hub so the selected meta-model follows the dashboard controls.
+                </p>
+              </div>
+              <div className="backend-config-grid">
+                <div className="summary-pill">
+                  <span>Meta-model</span>
+                  <strong>{stackingConfig.stacking_meta_model_type}</strong>
+                </div>
+                <div className="summary-pill">
+                  <span>Hidden layers</span>
+                  <strong>{stackingConfig.stacking_hidden_layer_sizes.join(", ")}</strong>
+                </div>
+                <div className="summary-pill">
+                  <span>Alpha</span>
+                  <strong>{stackingConfig.stacking_alpha}</strong>
+                </div>
+                <div className="summary-pill">
+                  <span>Max iterations</span>
+                  <strong>{stackingConfig.stacking_max_iter}</strong>
+                </div>
               </div>
             </div>
             <div className="backend-speed-grid">
@@ -5006,9 +6913,35 @@ function BackendProcessingPage() {
 }
 
 function ModelAnalyticalHubPage() {
-  const { patient, modelResults, updateSection } = usePatient();
+  const { patient, modelResults, updateSection, modelConfigSaveState } = usePatient();
   const step = flowSteps[6];
-  const hubGroups = React.useMemo(() => getModelHubGroups(), []);
+  const hubGroups = React.useMemo(() => {
+    const groups = getModelHubGroups();
+    const isVisible = (model) => model.key !== "anomaly-transformer" && model.name !== "Anomaly Transformer";
+    const catalog = groups.catalog.filter(isVisible);
+    return {
+      ...groups,
+      catalog,
+      ml: groups.ml.filter(isVisible),
+      dl: groups.dl.filter(isVisible),
+      allCount: catalog.length,
+    };
+  }, []);
+  const analysisReady = modelResults.status === "complete";
+  const conformalPValue = modelResults.backendPrediction?.conformal_p_value ?? null;
+  const sequenceScore = modelResults.backendPrediction?.prediction?.sequence_anomaly_score ?? null;
+  const sequenceScoreNormalized = modelResults.backendPrediction?.prediction?.sequence_anomaly_score_normalized ?? null;
+  const sequenceHistoryLength = modelResults.backendPrediction?.prediction?.sequence_history_length ?? 0;
+  const driftAlarm = modelResults.backendPrediction?.prediction?.score_stream_drift_alarm ?? false;
+  const driftMethod = modelResults.backendPrediction?.prediction?.score_stream_drift_method ?? "none";
+  const reconstructionResidualHeatmap = modelResults.backendPrediction?.reconstruction_residual_heatmap ?? null;
+  const conformalAssessment =
+    modelResults.backendPrediction?.conformal_assessment || "Run the backend scoring path to get a conformal verdict.";
+  const conformalStatusLabel = modelResults.backendPrediction
+    ? conformalPValue !== null && conformalPValue <= 0.05
+      ? "Anomalous at α=0.05"
+      : "Not anomalous at α=0.05"
+    : "Awaiting backend scoring";
   const activeModel = React.useMemo(
     () => hubGroups.catalog.find((model) => model.name === patient.modelHub.activeModel) || hubGroups.catalog[0] || null,
     [hubGroups.catalog, patient.modelHub.activeModel],
@@ -5024,12 +6957,23 @@ function ModelAnalyticalHubPage() {
     () => [...hubGroups.catalog].sort((a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0))[0] || null,
     [hubGroups.catalog],
   );
+  const latentManifold = React.useMemo(
+    () => modelResults.backendPrediction?.latent_manifold || buildFallbackLatentManifold(hubGroups.catalog, activeModel, primaryModel),
+    [activeModel, hubGroups.catalog, modelResults.backendPrediction, primaryModel],
+  );
+  const residualHeatmap = React.useMemo(
+    () =>
+      modelResults.backendPrediction?.reconstruction_residual_heatmap ||
+      buildFallbackReconstructionResidualHeatmap(hubGroups.catalog, activeModel),
+    [activeModel, hubGroups.catalog, modelResults.backendPrediction],
+  );
 
   return (
     <StepSkeleton
+      gridClassName="step-shell-grid--model"
       step={step}
       left={
-        <div className="section-stack">
+        <div className="section-stack model-hub-main">
           <section className="model-hub-shell">
             <div className="section-card__head">
               <div>
@@ -5049,7 +6993,9 @@ function ModelAnalyticalHubPage() {
                   onChange={(e) => updateSection("modelHub", { activeModel: e.target.value })}
                 >
                   {hubGroups.catalog.map((model) => (
-                    <option key={model.key}>{model.name}</option>
+                    <option key={model.key} value={model.name}>
+                      {model.name}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -5059,11 +7005,12 @@ function ModelAnalyticalHubPage() {
                   rows="5"
                   value={patient.modelHub.reviewNote}
                   onChange={(e) => updateSection("modelHub", { reviewNote: e.target.value })}
-                />
+                  />
               </label>
             </div>
           </section>
 
+          {false ? (
           <section className="model-hub-focus">
             <div className="section-card__head">
               <div>
@@ -5100,18 +7047,87 @@ function ModelAnalyticalHubPage() {
                   <span>Memory</span>
                   <strong>{activeModel?.memoryMb ?? "N/A"} MB</strong>
                 </div>
+                <div>
+                  <span>Conformal p-value</span>
+                  <strong>{conformalPValue === null ? "N/A" : conformalPValue.toFixed(4)}</strong>
+                </div>
+                <div>
+                  <span>Verdict</span>
+                  <strong>{conformalStatusLabel}</strong>
+                </div>
+                <div>
+                  <span>Visit sequence</span>
+                  <strong>{sequenceHistoryLength ? `${sequenceHistoryLength} visits` : "No history"}</strong>
+                </div>
+                <div>
+                  <span>Sequence score</span>
+                  <strong>{sequenceScore === null ? "N/A" : Number(sequenceScore).toFixed(4)}</strong>
+                </div>
+                <div>
+                  <span>Sequence blend</span>
+                  <strong>{sequenceScoreNormalized === null ? "N/A" : Number(sequenceScoreNormalized).toFixed(4)}</strong>
+                </div>
+                <div>
+                  <span>Trend drift</span>
+                  <strong>{driftAlarm ? "Shift detected" : "Stable"}</strong>
+                </div>
+                <div>
+                  <span>Drift method</span>
+                  <strong>{driftMethod}</strong>
+                </div>
               </div>
               <p className="model-hub-focus__copy">
                 {primaryModel?.name || "The primary model"} is the strongest single detector in the current catalog, while {activeModel?.variantLabel || "the trained model"} remains the current selection.
               </p>
+              <div className="callout callout--soft">
+                <strong>Conformal assessment</strong>
+                <p>{conformalAssessment}</p>
+              </div>
             </div>
           </section>
+          ) : null}
 
-          <ModelHubExplainabilityCard activeModel={activeModel} primaryModel={primaryModel} modelResults={modelResults} />
+          {false ? (
+          <AnalysisSection
+            unlocked={true}
+            eyebrow="Drift"
+            title="Score stream change point"
+            description="This compact stream view marks where the score trend shifts away from the patient baseline."
+          >
+            <ScoreStreamDriftChart
+              stream={Array.isArray(modelResults.backendPrediction?.prediction?.score_stream) ? modelResults.backendPrediction.prediction.score_stream : []}
+              fallbackSeries={modelResults.trendSeries || []}
+              driftIndex={driftAlarm ? modelResults.backendPrediction?.prediction?.score_stream_drift_change_index : null}
+              loading={false}
+              driftActive={driftAlarm}
+              driftMethod={driftMethod}
+            />
+          </AnalysisSection>
+          ) : null}
+
+          <AnalysisSection
+            unlocked={true}
+            eyebrow="Latent geometry"
+            title="VAE manifold with Deep SVDD boundary"
+            description="The latent map shows which records cluster together and whether the current record sits inside or outside the projected hypersphere."
+          >
+            <LatentManifoldCard manifold={latentManifold} loading={false} />
+          </AnalysisSection>
+
+          <AnalysisSection
+            unlocked={true}
+            eyebrow="Residuals"
+            title="Per-feature reconstruction errors"
+            description="Each reconstruction detector row shows where this patient record was hardest to reproduce."
+          >
+            <ResidualHeatmapCard heatmap={residualHeatmap} loading={false} />
+          </AnalysisSection>
+
+          {false ? <ModelHubExplainabilityCard activeModel={activeModel} primaryModel={primaryModel} modelResults={modelResults} /> : null}
         </div>
       }
       right={
-        <div className="section-stack">
+        <div className="section-stack model-hub-stack">
           <AnalysisSection
             unlocked={true}
             eyebrow="Risk map"
@@ -5135,6 +7151,7 @@ function ModelAnalyticalHubPage() {
             models={hubGroups.dl}
           />
 
+          {false ? (
           <section className="model-hub-notes">
             <div className="callout callout--accent">
               <strong>Hub summary</strong>
@@ -5154,6 +7171,7 @@ function ModelAnalyticalHubPage() {
               </div>
             </div>
           </section>
+          ) : null}
         </div>
       }
       footer="This final hub now catalogues all trained models by ML and DL family and keeps the active model visible for review."

@@ -24,13 +24,16 @@ If you want the deeper design and workflow reference, start here:
 
 The system follows a simple clinical flow:
 
-1. Collect patient details
-2. Enter or upload lab results
-3. Review patient care insights
-4. Compare model behavior and runtime cost
-5. Turn the analysis into decision support
-6. Keep backend processing hidden for internal review
-7. Finish with the model analytical hub
+| Step | Screen | What it does |
+| --- | --- | --- |
+| 1 | Patient Details | Collects patient context and the bedside inputs needed to unlock the workflow. |
+| 2 | Lab Investigation | Accepts manual or uploaded lab values, with responsive reference/help cards. |
+| 3 | Patient Care Insights | Summarizes the current record with compact, mobile-friendly insight cards. |
+| 4 | Comparative Analysis | Compares models, runtime cost, and risk behavior in a stacked layout. |
+| 5 | Decision Support | Converts the analysis into practical next steps and consensus guidance. |
+| 6 | Model Analytical Hub | Surfaces latent manifold, residuals, and model inventory for final review. |
+
+Internal backend processing still exists in the architecture, but it is no longer presented as a separate public step.
 
 The goal is not only to detect anomalies, but to present them clearly enough that a clinician or reviewer can understand what changed and what to do next.
 
@@ -149,7 +152,7 @@ npm run dev
 
 ### Step 1. Patient Details
 
-The first screen collects the minimum information needed to start the case.
+The first screen collects the minimum information needed to start the case and includes the bedside checks that gate progress.
 
 Required inputs:
 
@@ -162,6 +165,11 @@ Required inputs:
 - Body temperature
 - Respiratory rate
 
+Required bedside labs:
+
+- Hemoglobin
+- Blood glucose
+
 Optional context:
 
 - Patient ID
@@ -171,7 +179,7 @@ Optional context:
 - Chief complaint
 - Visit date
 
-The page shows intake readiness, BMI, triage, and location. BMI remains `0.00` until weight and height are both entered.
+The page shows intake readiness, BMI, triage, and location. BMI remains `0.00` until weight and height are both entered. The Continue button stays disabled until the mandatory fields are complete.
 
 ### Step 2. Lab Investigation
 
@@ -179,9 +187,7 @@ This screen supports both manual lab entry and uploaded reports.
 
 Required lab fields:
 
-- Fasting glucose
-- Postprandial glucose
-- Hemoglobin
+None. Step 2 is now intentionally optional so users can continue even when only partial lab data is available.
 
 Optional lab fields:
 
@@ -203,7 +209,7 @@ Optional lab fields:
 - Chloride
 - Bicarbonate
 
-The uploader accepts CSV and PDF reports and auto-fills recognized values. Missing optional fields do not block progress.
+The uploader accepts CSV and PDF reports and auto-fills recognized values. Missing lab values do not block progress.
 
 ### Step 3. Patient Care Insights
 
@@ -243,20 +249,7 @@ It includes:
 - Model consensus
 - Consensus risk map
 
-### Step 6. Backend Processing
-
-This stage remains part of the internal workflow, but it is hidden from the main user flow.
-
-It documents:
-
-- Preprocessing
-- Feature engineering
-- Scaling
-- Validation
-
-The stage is hidden from the main user flow, but it is still part of the architecture.
-
-### Step 7. Model Analytical Hub
+### Step 6. Model Analytical Hub
 
 This is the final review stage.
 
@@ -267,6 +260,12 @@ It groups:
 - Comparison outputs
 - Final review notes
 - Latent manifold and reconstruction residual views
+
+| Hub Card | Purpose | Notable behavior |
+| --- | --- | --- |
+| Latent manifold | Shows VAE latents projected to 2D with a Deep SVDD boundary overlay. | Keeps the current record highlighted and uses a compact chart frame across screen sizes. |
+| Residuals | Shows per-feature reconstruction errors for the current record. | Uses a readable summary panel and a constrained matrix so content does not overflow on mobile or desktop. |
+| Model inventory | Lists trained ML and DL models by family. | The top score badge now matches the displayed accuracy metric. |
 
 ## Sample Data And Test Reports
 

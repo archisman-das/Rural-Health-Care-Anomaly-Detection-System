@@ -186,6 +186,13 @@ class DeepAutoencoder(BaseEstimator, OutlierMixin):
         recon, _ = self._forward(X, training=False)
         return np.mean(np.abs(recon - X), axis=1)
 
+    def reconstruction_residuals(self, X: Any) -> np.ndarray:
+        if not hasattr(self, "weights_"):
+            raise RuntimeError("Autoencoder must be fit before scoring.")
+        X = np.asarray(X, dtype=float)
+        recon, _ = self._forward(X, training=False)
+        return recon - X
+
     def fit(self, X, y=None):
         X = np.asarray(X, dtype=float)
         if X.ndim != 2:

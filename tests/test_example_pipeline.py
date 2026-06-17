@@ -2,6 +2,8 @@ import io
 import unittest
 from contextlib import redirect_stdout
 
+import numpy as np
+
 from example_training_inference import (
     build_inference_data,
     build_large_training_data,
@@ -10,6 +12,7 @@ from example_training_inference import (
 )
 from rural_health_anomaly import PreprocessingConfig, build_anomaly_pipeline
 from rural_health_anomaly.common_interface_demo import main as common_interface_demo_main
+from rural_health_anomaly.training import score_records, train_anomaly_pipeline
 
 
 class ExamplePipelineTests(unittest.TestCase):
@@ -40,6 +43,55 @@ class ExamplePipelineTests(unittest.TestCase):
         self.assertEqual(len(scores), len(inference_df))
         self.assertEqual(len(flags), len(inference_df))
         self.assertTrue(set(flags).issubset({1, -1}))
+
+        scored_frame = pipeline.named_steps["model"].raw_anomaly_score(pipeline.named_steps["preprocessor"].transform(inference_df))
+        self.assertEqual(len(scored_frame), len(inference_df))
+
+    def test_point_anomaly_head_emits_zscore_columns(self):
+        training_df = build_training_data()
+        inference_df = build_inference_data()
+
+        pipeline = train_anomaly_pipeline(training_df, config=PreprocessingConfig(scaler="standard", apply_pca=False))
+
+        point_summary = getattr(pipeline, "point_anomaly_summary_", {})
+
+        self.assertEqual(point_summary.get("status"), "trained")
+        scored = score_records(pipeline, inference_df)
+
+        self.assertIn("point_anomaly_score", scored.columns)
+        self.assertIn("point_anomaly_top_feature", scored.columns)
+        self.assertIn("point_anomaly_top_feature_zscore", scored.columns)
+        self.assertIn("contextual_anomaly_score", scored.columns)
+        self.assertIn("contextual_anomaly_top_feature", scored.columns)
+        self.assertIn("contextual_anomaly_top_feature_zscore", scored.columns)
+        self.assertIn("contextual_anomaly_history_length", scored.columns)
+        self.assertIn("collective_anomaly_score", scored.columns)
+        self.assertIn("collective_anomaly_top_group", scored.columns)
+        self.assertIn("collective_anomaly_top_group_error", scored.columns)
+        point_zscore_columns = [column for column in scored.columns if column.startswith("point_zscore__")]
+        contextual_zscore_columns = [column for column in scored.columns if column.startswith("contextual_zscore__")]
+        collective_group_columns = [column for column in scored.columns if column.startswith("collective_group_error__")]
+        self.assertGreater(len(point_zscore_columns), 0)
+        self.assertGreater(len(contextual_zscore_columns), 0)
+        self.assertGreater(len(collective_group_columns), 0)
+        self.assertTrue(np.isfinite(scored["point_anomaly_score"].to_numpy(dtype=float)).all())
+        self.assertTrue(np.isfinite(scored["contextual_anomaly_score"].to_numpy(dtype=float)).all())
+        self.assertTrue(np.isfinite(scored["collective_anomaly_score"].to_numpy(dtype=float)).all())
+
+    def test_distribution_monitor_emits_staleness_alarm_on_shifted_batch(self):
+        training_df = build_training_data()
+        inference_df = build_inference_data().copy()
+        numeric_columns = inference_df.select_dtypes(include=[np.number]).columns
+        inference_df[numeric_columns] = inference_df[numeric_columns] * 8.0 + 50.0
+
+        pipeline = train_anomaly_pipeline(training_df, config=PreprocessingConfig(scaler="standard", apply_pca=False))
+        scored = score_records(pipeline, inference_df)
+
+        self.assertIn("distribution_mmd_score", scored.columns)
+        self.assertIn("distribution_mmd_threshold", scored.columns)
+        self.assertIn("distribution_staleness_alarm", scored.columns)
+        self.assertTrue(np.isfinite(scored["distribution_mmd_score"].to_numpy(dtype=float)).all())
+        self.assertTrue(bool(scored["distribution_staleness_alarm"].iloc[0]))
 
     def test_example_main_runs_without_error(self):
         buffer = io.StringIO()

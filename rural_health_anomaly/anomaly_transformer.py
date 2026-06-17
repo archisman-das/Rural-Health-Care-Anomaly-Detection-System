@@ -239,6 +239,13 @@ class AnomalyTransformer(BaseEstimator, OutlierMixin):
     def reconstruction_error(self, X: Any) -> np.ndarray:
         return self._reconstruction_error(_ensure_2d_array(X))
 
+    def reconstruction_residuals(self, X: Any) -> np.ndarray:
+        X = _ensure_2d_array(X)
+        if not hasattr(self, "attention_weights_"):
+            raise RuntimeError("AnomalyTransformer must be fit before scoring.")
+        cache = self._forward(X, training=False)
+        return cache.recon - X
+
     def attention_discrepancy(self, X: Any) -> np.ndarray:
         return self._attention_discrepancy(_ensure_2d_array(X))
 

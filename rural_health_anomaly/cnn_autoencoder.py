@@ -254,6 +254,13 @@ class CNNAutoencoder(BaseEstimator, OutlierMixin):
         X = np.asarray(X, dtype=float)
         return self._reconstruction_error(X)
 
+    def reconstruction_residuals(self, X: Any) -> np.ndarray:
+        if not hasattr(self, "conv_filters_"):
+            raise RuntimeError("CNN autoencoder must be fit before scoring.")
+        X = np.asarray(X, dtype=float)
+        recon, _ = self._forward(X, training=False)
+        return recon - X
+
     def raw_score(self, X: Any) -> np.ndarray:
         return self.reconstruction_error(X)
 
