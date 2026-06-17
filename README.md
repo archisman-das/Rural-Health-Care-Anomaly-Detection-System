@@ -180,6 +180,7 @@ Then open:
 | Static SPA support | Enabled through the backend fallback route |
 | Optional auth | Use `API_AUTH_TOKEN` or `--auth-token` if you want to protect requests |
 | Render | Use the included `render.yaml` blueprint with a Docker web service |
+| Live deployment | https://rural-health-anomaly-dashboard-n5wz.onrender.com/patient-details |
 
 ## The Clinical Workflow
 
