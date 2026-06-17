@@ -1,0 +1,8 @@
+{
+  "model_name": "web-demo-model",
+  "model_version": "artifact-ae182a12301e",
+  "artifact_sha256": "ae182a12301e908f3441fb6d6e3babb02471947aefb37223c0f8d63e30c31d3c",
+  "model_path": "artifacts\\web-demo-model.joblib",
+  "created_at_utc": "2026-06-13T19:15:05.690005Z",
+  "pipeline_class": "Pipeline"
+}

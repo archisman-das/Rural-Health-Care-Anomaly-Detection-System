@@ -1,0 +1,371 @@
+{
+  "dashboardState": "Live dashboard metrics loaded",
+  "lastUpdated": "June 13, 2026 4:45 PM",
+  "summary": [
+    {
+      "label": "Patients screened",
+      "value": "10,284",
+      "detail": "across the latest clinic window"
+    },
+    {
+      "label": "High-risk alerts",
+      "value": "341",
+      "detail": "alerts above the ensemble threshold"
+    },
+    {
+      "label": "Review notes",
+      "value": "684",
+      "detail": "clinician true/false-positive tags"
+    },
+    {
+      "label": "Agreement rate",
+      "value": "88%",
+      "detail": "three-model consensus on the same patient"
+    }
+  ],
+  "riskTiles": [
+    {
+      "label": "Low risk",
+      "value": "7,418",
+      "band": "risk-low"
+    },
+    {
+      "label": "Medium risk",
+      "value": "2,525",
+      "band": "risk-medium"
+    },
+    {
+      "label": "High risk",
+      "value": "341",
+      "band": "risk-high"
+    },
+    {
+      "label": "Trend shift",
+      "value": "+12%",
+      "band": "risk-medium"
+    },
+    {
+      "label": "False positives",
+      "value": "68",
+      "band": "risk-low"
+    },
+    {
+      "label": "Readmissions",
+      "value": "204",
+      "band": "risk-high"
+    }
+  ],
+  "riskLegend": [
+    {
+      "title": "Low",
+      "color": "#8ff1cf",
+      "detail": "Routine follow-up. Scores remain below 0.4 and no urgent alert is fired."
+    },
+    {
+      "title": "Medium",
+      "color": "#ffcb6d",
+      "detail": "Closer review recommended. Scores are between 0.4 and 0.7."
+    },
+    {
+      "title": "High",
+      "color": "#ff7f96",
+      "detail": "Immediate attention. Final ensemble score is at or above 0.7."
+    }
+  ],
+  "modelRows": [
+    {
+      "model": "Isolation Forest",
+      "color": "#62d4ff",
+      "precision": 0.81,
+      "recall": 0.76,
+      "f1": 0.78,
+      "auc": 0.86,
+      "auprc": 0.79,
+      "latency": "6.8 ms",
+      "ram": "48 MB",
+      "fusionWeight": 0.12,
+      "thresholdLow": 0.4,
+      "thresholdMedium": 0.65,
+      "thresholdHigh": 0.8,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "One-Class SVM",
+      "color": "#ff9aae",
+      "precision": 0.78,
+      "recall": 0.73,
+      "f1": 0.75,
+      "auc": 0.83,
+      "auprc": 0.76,
+      "latency": "11.3 ms",
+      "ram": "64 MB",
+      "fusionWeight": 0.08,
+      "thresholdLow": 0.38,
+      "thresholdMedium": 0.62,
+      "thresholdHigh": 0.78,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "Local Outlier Factor",
+      "color": "#b6a6ff",
+      "precision": 0.79,
+      "recall": 0.74,
+      "f1": 0.76,
+      "auc": 0.84,
+      "auprc": 0.77,
+      "latency": "8.4 ms",
+      "ram": "52 MB",
+      "fusionWeight": 0.1,
+      "thresholdLow": 0.36,
+      "thresholdMedium": 0.64,
+      "thresholdHigh": 0.79,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "Autoencoder",
+      "color": "#8ff1cf",
+      "precision": 0.84,
+      "recall": 0.8,
+      "f1": 0.82,
+      "auc": 0.89,
+      "auprc": 0.84,
+      "latency": "9.5 ms",
+      "ram": "78 MB",
+      "fusionWeight": 0.14,
+      "thresholdLow": 0.32,
+      "thresholdMedium": 0.58,
+      "thresholdHigh": 0.73,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "Anomaly Transformer",
+      "color": "#f4a261",
+      "precision": 0.82,
+      "recall": 0.77,
+      "f1": 0.79,
+      "auc": 0.87,
+      "auprc": 0.81,
+      "latency": "7.1 ms",
+      "ram": "96 MB",
+      "fusionWeight": 0.3,
+      "thresholdLow": 0.35,
+      "thresholdMedium": 0.65,
+      "thresholdHigh": 0.75,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "Variational Autoencoder",
+      "color": "#34d399",
+      "precision": 0.83,
+      "recall": 0.79,
+      "f1": 0.81,
+      "auc": 0.88,
+      "auprc": 0.83,
+      "latency": "10.2 ms",
+      "ram": "88 MB",
+      "fusionWeight": 0.12,
+      "thresholdLow": 0.33,
+      "thresholdMedium": 0.6,
+      "thresholdHigh": 0.76,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "GANomaly",
+      "color": "#7fe7c4",
+      "precision": 0.84,
+      "recall": 0.8,
+      "f1": 0.82,
+      "auc": 0.89,
+      "auprc": 0.84,
+      "latency": "12.4 ms",
+      "ram": "104 MB",
+      "fusionWeight": 0.13,
+      "thresholdLow": 0.34,
+      "thresholdMedium": 0.61,
+      "thresholdHigh": 0.77,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "CNN Autoencoder",
+      "color": "#a78bfa",
+      "precision": 0.85,
+      "recall": 0.81,
+      "f1": 0.83,
+      "auc": 0.9,
+      "auprc": 0.85,
+      "latency": "8.9 ms",
+      "ram": "112 MB",
+      "fusionWeight": 0.15,
+      "thresholdLow": 0.31,
+      "thresholdMedium": 0.6,
+      "thresholdHigh": 0.74,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "Deep SVDD",
+      "color": "#ffcb6d",
+      "precision": 0.82,
+      "recall": 0.78,
+      "f1": 0.8,
+      "auc": 0.88,
+      "auprc": 0.82,
+      "latency": "6.5 ms",
+      "ram": "56 MB",
+      "fusionWeight": 0.1,
+      "thresholdLow": 0.37,
+      "thresholdMedium": 0.63,
+      "thresholdHigh": 0.78,
+      "tuningMode": "balanced"
+    },
+    {
+      "model": "Ensemble",
+      "color": "#ff7f96",
+      "precision": 0.87,
+      "recall": 0.83,
+      "f1": 0.85,
+      "auc": 0.92,
+      "auprc": 0.89,
+      "latency": "15.4 ms",
+      "ram": "118 MB",
+      "fusionWeight": 1,
+      "thresholdLow": 0.35,
+      "thresholdMedium": 0.65,
+      "thresholdHigh": 0.75,
+      "tuningMode": "balanced"
+    }
+  ],
+  "trend": [
+    {
+      "label": "Week 1",
+      "value": 0.29
+    },
+    {
+      "label": "Week 2",
+      "value": 0.32
+    },
+    {
+      "label": "Week 3",
+      "value": 0.36
+    },
+    {
+      "label": "Week 4",
+      "value": 0.41
+    },
+    {
+      "label": "Week 5",
+      "value": 0.46
+    },
+    {
+      "label": "Week 6",
+      "value": 0.5
+    },
+    {
+      "label": "Week 7",
+      "value": 0.54
+    },
+    {
+      "label": "Week 8",
+      "value": 0.59
+    }
+  ],
+  "distribution": [
+    4,
+    8,
+    12,
+    16,
+    18,
+    15,
+    11,
+    8,
+    5,
+    3
+  ],
+  "features": [
+    {
+      "name": "age × glucose",
+      "value": 0.92,
+      "source": "age, glucose_fasting_mg_dl",
+      "type": "interaction"
+    },
+    {
+      "name": "7-day mean heart rate",
+      "value": 0.82,
+      "source": "heart_rate_bpm",
+      "type": "rolling mean"
+    },
+    {
+      "name": "30-day std blood pressure",
+      "value": 0.74,
+      "source": "systolic_bp_mmhg, diastolic_bp_mmhg",
+      "type": "rolling std"
+    },
+    {
+      "name": "electrolyte imbalance",
+      "value": 0.68,
+      "source": "na_mmol_l, k_mmol_l, ca_mg_dl",
+      "type": "clinical"
+    }
+  ],
+  "agreement": [
+    {
+      "title": "All three models flagged",
+      "value": "341 alerts",
+      "detail": "Highest-confidence group for clinician prioritization.",
+      "score": 0.92
+    },
+    {
+      "title": "Two-model agreement",
+      "value": "804 alerts",
+      "detail": "Useful for secondary review and active learning.",
+      "score": 0.76
+    },
+    {
+      "title": "Single-model dissent",
+      "value": "138 alerts",
+      "detail": "Typically monitored for model drift or noise.",
+      "score": 0.43
+    }
+  ],
+  "feedback": [
+    {
+      "title": "True positives",
+      "value": "462",
+      "detail": "Clinicians confirmed the alert was valid.",
+      "score": 0.8,
+      "positive": true
+    },
+    {
+      "title": "False positives",
+      "value": "83",
+      "detail": "Alerts that should be down-weighted in retraining.",
+      "score": 0.36,
+      "positive": false
+    }
+  ],
+  "runtime": [
+    {
+      "title": "Inference latency",
+      "metric": "9.0 ms",
+      "subtitle": "Time to screen one patient",
+      "detail": "Ensemble scoring per patient on the reference device."
+    },
+    {
+      "title": "Training time",
+      "metric": "32 min",
+      "subtitle": "Time needed to build the model",
+      "detail": "Full pipeline fit on the expanded tabular dataset."
+    },
+    {
+      "title": "Model size",
+      "metric": "28 MB",
+      "subtitle": "How much space it uses",
+      "detail": "Serialized production bundle size."
+    },
+    {
+      "title": "RAM usage",
+      "metric": "132 MB",
+      "subtitle": "Memory needed while running",
+      "detail": "Peak memory footprint while scoring."
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-N-001,anomaly_free,Routine Panel - Normal,Healthy baseline values inside the expected ranges.,90,124,5.2,14.1,6.4,236,84,56,118,24,21,0.6,4.4,0.8,14,102,141,4.2,104,25

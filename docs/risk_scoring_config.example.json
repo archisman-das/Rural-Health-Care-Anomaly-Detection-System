@@ -1,0 +1,9 @@
+{
+  "apply_pca": false,
+  "risk_scoring_weights": {
+    "anomaly": 0.20,
+    "vitals": 0.35,
+    "labs": 0.30,
+    "access": 0.15
+  }
+}

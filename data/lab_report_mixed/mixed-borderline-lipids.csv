@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-403,anomaly,Borderline Lipid Shift,LDL and triglycerides are elevated while HDL is low.,99,137,5.6,13.5,6.8,245,138,36,196,29,30,0.8,4.0,0.9,16,96,139,4.3,102,24

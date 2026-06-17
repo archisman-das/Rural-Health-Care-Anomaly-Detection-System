@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-N-005,anomaly_free,Routine Panel - Normal,Normal CBC with stable chemistry and glucose.,93,127,5.4,14.0,6.5,244,87,51,129,26,24,0.8,4.2,0.9,15,97,140,4.1,103,24

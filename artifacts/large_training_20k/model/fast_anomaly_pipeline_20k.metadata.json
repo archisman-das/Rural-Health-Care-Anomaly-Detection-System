@@ -1,0 +1,8 @@
+{
+  "model_name": "fast_anomaly_pipeline_20k",
+  "model_version": "artifact-51a55d6a7432",
+  "artifact_sha256": "51a55d6a74328177ac1c387256dd93a140ae972f0212b1c628c2d9ea70af2c3a",
+  "model_path": "artifacts\\large_training_20k\\model\\fast_anomaly_pipeline_20k.joblib",
+  "created_at_utc": "2026-06-15T18:23:58.829449Z",
+  "pipeline_class": "Pipeline"
+}

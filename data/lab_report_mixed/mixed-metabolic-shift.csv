@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-410,anomaly,Metabolic Risk Shift,Mixed lipid and glucose abnormalities with mild liver strain.,123,181,6.5,13.1,7.4,250,156,35,206,47,52,1.1,4.0,1.0,19,89,137,4.6,101,23

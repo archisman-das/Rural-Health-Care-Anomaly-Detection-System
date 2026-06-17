@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-301,anomaly,Kidney Function Focus,Reduced kidney function with electrolyte stress.,102,148,5.9,12.7,7.2,244,101,45,149,25,24,0.7,4.0,2.1,41,47,128,5.7,92,19

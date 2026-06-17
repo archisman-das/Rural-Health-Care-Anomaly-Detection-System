@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+LIV-412,anomaly,Liver Panel Review,Raised liver enzymes and bilirubin with low albumin.,94,128,5.5,13.2,6.5,230,110,45,138,86,93,2.4,3.1,0.9,16,95,139,4.2,103,24

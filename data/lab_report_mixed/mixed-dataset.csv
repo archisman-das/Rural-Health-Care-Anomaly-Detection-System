@@ -1,0 +1,24 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-N-001,anomaly_free,Routine Panel - Normal,Healthy baseline values inside the expected ranges.,90,124,5.2,14.1,6.4,236,84,56,118,24,21,0.6,4.4,0.8,14,102,141,4.2,104,25
+MIX-N-002,anomaly_free,Routine Panel - Normal,Another normal case with slightly different but still healthy values.,96,131,5.5,13.6,7.0,248,92,49,136,28,25,0.8,4.1,0.9,16,96,139,4.4,102,24
+MIX-A-101,anomaly,Prediabetes and Sugar Drift,Mildly elevated glucose values with borderline HbA1c.,118,168,6.1,13.9,6.9,242,104,43,164,27,28,0.7,4.2,0.9,15,95,138,4.3,103,24
+MIX-A-102,anomaly,Diabetes Control Panel,"High fasting glucose, high postprandial glucose, and elevated HbA1c.",182,259,9.0,13.4,7.3,252,121,37,218,31,36,0.9,4.0,1.0,18,92,137,4.6,101,23
+MIX-A-201,anomaly,Anemia and CBC Review,Low hemoglobin with high WBC and platelets.,94,128,5.4,9.1,12.6,505,90,51,129,23,20,0.6,3.7,0.8,13,99,140,4.1,103,25
+MIX-A-202,anomaly,Inflammation / Infection Pattern,High WBC count with reactive blood count changes.,97,134,5.6,12.8,15.2,470,98,46,141,29,30,0.8,3.9,0.9,16,97,139,4.2,102,24
+MIX-A-301,anomaly,Kidney Function Focus,Reduced kidney function with electrolyte stress.,102,148,5.9,12.7,7.2,244,101,45,149,25,24,0.7,4.0,2.1,41,47,128,5.7,92,19
+MIX-A-302,anomaly,Liver Panel Review,Raised liver enzymes and bilirubin with low albumin.,91,127,5.3,13.0,6.7,229,108,48,132,91,97,2.3,3.0,0.9,15,94,140,4.3,103,24
+MIX-A-303,anomaly,Electrolyte Imbalance Panel,"Sodium, potassium, chloride, and bicarbonate are abnormal.",88,122,5.1,14.0,6.5,238,89,54,121,23,19,0.6,4.3,0.8,14,100,129,5.8,91,18
+MIX-A-401,anomaly,Combined Multi-System Abnormality,"Mixed glucose, CBC, liver, kidney, and electrolyte abnormalities.",158,236,8.3,10.2,11.9,165,145,34,214,63,71,1.8,3.2,1.7,34,57,132,5.3,95,20
+MIX-N-003,anomaly_free,Routine Panel - Normal,Balanced values with good blood sugar and blood count.,88,118,5.1,14.4,6.2,228,79,58,112,22,19,0.5,4.5,0.7,12,105,142,4.0,105,26
+MIX-N-004,anomaly_free,Routine Panel - Normal,Another clean report for normal upload testing.,97,134,5.4,13.8,7.2,251,96,47,139,27,23,0.8,4.2,0.9,17,93,138,4.5,101,23
+MIX-A-402,anomaly,Borderline CBC Variation,Mild anemia with mild inflammatory rise.,93,129,5.4,11.0,11.4,460,93,50,133,25,24,0.7,3.9,0.9,15,98,140,4.2,103,24
+MIX-A-403,anomaly,Borderline Lipid Shift,LDL and triglycerides are elevated while HDL is low.,99,137,5.6,13.5,6.8,245,138,36,196,29,30,0.8,4.0,0.9,16,96,139,4.3,102,24
+MIX-A-404,anomaly,Dehydration and Salt Stress,Renal markers and sodium shift suggest fluid imbalance.,94,125,5.3,14.7,7.1,242,90,52,127,24,22,0.7,4.4,1.4,29,68,148,5.2,111,20
+MIX-A-405,anomaly,Severe Liver Stress,Marked liver enzyme elevation and low albumin.,86,119,5.2,12.6,7.0,219,102,44,145,142,176,3.1,2.8,1.0,17,91,136,4.1,102,23
+MIX-A-406,anomaly,Mild Hyperglycemia,Fasting and post-meal glucose are above normal but not extreme.,109,152,6.0,13.7,6.6,239,101,45,151,26,26,0.7,4.1,0.9,15,97,140,4.3,103,24
+MIX-A-407,anomaly,Mild Kidney Strain,Slightly elevated creatinine and reduced eGFR.,95,130,5.5,13.0,6.9,247,95,48,134,25,24,0.8,4.0,1.5,24,73,137,4.8,100,22
+MIX-A-408,anomaly,Mild Electrolyte Shift,Small electrolyte movement with mild bicarbonate reduction.,91,123,5.3,14.2,6.7,236,89,53,125,23,21,0.6,4.3,0.9,14,99,133,5.2,96,21
+MIX-A-409,anomaly,Combined Multi-System Abnormality,"Glucose, CBC, liver, kidney, and electrolytes are all affected.",171,244,8.7,9.8,14.1,488,149,33,232,74,88,1.9,3.1,1.8,36,55,131,5.6,93,19
+MIX-N-005,anomaly_free,Routine Panel - Normal,Normal CBC with stable chemistry and glucose.,93,127,5.4,14.0,6.5,244,87,51,129,26,24,0.8,4.2,0.9,15,97,140,4.1,103,24
+MIX-A-410,anomaly,Metabolic Risk Shift,Mixed lipid and glucose abnormalities with mild liver strain.,123,181,6.5,13.1,7.4,250,156,35,206,47,52,1.1,4.0,1.0,19,89,137,4.6,101,23
+MIX-A-411,anomaly,Hospital Follow-up Abnormality,Post-discharge panel with lingering multiple abnormalities.,145,216,7.7,11.5,10.9,182,132,39,190,58,64,1.4,3.4,1.3,26,78,134,5.0,98,22

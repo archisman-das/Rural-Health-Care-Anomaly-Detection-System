@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-202,anomaly,Inflammation / Infection Pattern,High WBC count with reactive blood count changes.,97,134,5.6,12.8,15.2,470,98,46,141,29,30,0.8,3.9,0.9,16,97,139,4.2,102,24

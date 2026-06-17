@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-N-002,anomaly_free,Routine Panel - Normal,Another normal case with slightly different but still healthy values.,96,131,5.5,13.6,7.0,248,92,49,136,28,25,0.8,4.1,0.9,16,96,139,4.4,102,24

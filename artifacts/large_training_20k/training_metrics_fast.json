@@ -1,0 +1,15 @@
+{
+  "train_accuracy": 0.9437142857142857,
+  "validation_accuracy": 0.9433333333333334,
+  "test_accuracy": 0.9393333333333334,
+  "validation_precision": 0.811816192560175,
+  "validation_recall": 0.8153846153846154,
+  "validation_f1": 0.8135964912280702,
+  "test_precision": 0.7949367088607595,
+  "test_recall": 0.7566265060240964,
+  "test_f1": 0.7753086419753087,
+  "test_auc": 0.8924424972617743,
+  "rows_train": 14000,
+  "rows_validation": 3000,
+  "rows_test": 3000
+}

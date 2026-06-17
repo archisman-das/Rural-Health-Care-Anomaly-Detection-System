@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-A-302,anomaly,Liver Panel Review,Raised liver enzymes and bilirubin with low albumin.,91,127,5.3,13.0,6.7,229,108,48,132,91,97,2.3,3.0,0.9,15,94,140,4.3,103,24

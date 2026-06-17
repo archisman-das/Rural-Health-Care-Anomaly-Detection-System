@@ -1,0 +1,2 @@
+sampleId,status,reportType,description,fastingGlucose,postprandialGlucose,hba1c,hemoglobin,wbcCount,plateletCount,ldl,hdl,triglycerides,ast,alt,bilirubin,albumin,creatinine,urea,egfr,sodium,potassium,chloride,bicarbonate
+MIX-N-003,anomaly_free,Routine Panel - Normal,Balanced values with good blood sugar and blood count.,88,118,5.1,14.4,6.2,228,79,58,112,22,19,0.5,4.5,0.7,12,105,142,4.0,105,26
