@@ -335,6 +335,7 @@ const comorbidityOptions = [
   "Depressive Disorder",
   "Osteoarthritis",
   "Asthma",
+  "None of the above",
 ];
 
 const labDefaultValues = Object.fromEntries(
@@ -6697,9 +6698,20 @@ function PatientDetailsPage() {
   );
   const toggleComorbidity = React.useCallback(
     (option) => {
-      const next = selectedComorbidities.includes(option)
-        ? selectedComorbidities.filter((value) => value !== option)
-        : [...selectedComorbidities, option];
+      const noneOption = "None of the above";
+      let next;
+
+      if (option === noneOption) {
+        next = selectedComorbidities.includes(noneOption) ? [] : [noneOption];
+      } else if (selectedComorbidities.includes(option)) {
+        next = selectedComorbidities.filter((value) => value !== option);
+      } else {
+        next = [
+          ...selectedComorbidities.filter((value) => value !== noneOption),
+          option,
+        ];
+      }
+
       updateSection("medicalHistory", {
         comorbidities: next.join(", "),
       });
