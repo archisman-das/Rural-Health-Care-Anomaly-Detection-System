@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -961,6 +962,10 @@ def create_app(
     frontend_dist = Path(os.getenv("FRONTEND_DIST_DIR", "/app/web/dist"))
     frontend_index = frontend_dist / "index.html"
     if frontend_index.exists():
+        @app.get("/")
+        def root() -> FileResponse:
+            return FileResponse(frontend_index)
+
         app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 
     return app
