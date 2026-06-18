@@ -765,6 +765,15 @@ def create_app(
             **_model_metadata(app),
         }
 
+    @app.get("/")
+    def root() -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "service": title,
+            "health": "/health",
+            "docs": "/docs",
+        }
+
     @app.get("/models", dependencies=[Depends(auth_dependency)])
     def models() -> dict[str, Any]:
         return {
