@@ -61,6 +61,10 @@ The web app provides a guided, step-by-step front end for:
 - Comparative analysis
 - Decision support
 
+Live deployment:
+
+- [Render deployment](https://rural-health-anomaly-dashboard.onrender.com)
+
 ### Dataset Assets
 
 The repository includes generated sample reports and mixed datasets that can be uploaded directly into the lab investigation step.
