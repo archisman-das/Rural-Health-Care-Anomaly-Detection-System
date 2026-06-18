@@ -43,7 +43,8 @@ const flowSteps = [
     title: "Patient Details",
     subtitle: "Capture identity, visit context, and baseline clinical notes.",
     checkpoint: "Demographics and intake data",
-    detail: "Start with the minimum required record so the rest of the flow has a stable patient anchor.",
+    detail:
+      "Start with the minimum required record so the rest of the flow has a stable patient anchor.",
     nextLabel: "Continue to Lab Investigation",
   },
   {
@@ -51,7 +52,8 @@ const flowSteps = [
     title: "Lab Investigation",
     subtitle: "Record laboratory values and the review status for each result.",
     checkpoint: "Lab panel and flags",
-    detail: "This page becomes the shared source of truth for blood work, chemistry values, and missing labs.",
+    detail:
+      "This page becomes the shared source of truth for blood work, chemistry values, and missing labs.",
     nextLabel: "Continue to Patient Care Insights",
   },
   {
@@ -59,46 +61,57 @@ const flowSteps = [
     title: "Patient Care Insights",
     subtitle: "Summarize care needs, risk signals, and clinician observations.",
     checkpoint: "Care notes and context",
-    detail: "We will use this stage to turn the raw intake into actionable bedside context.",
+    detail:
+      "We will use this stage to turn the raw intake into actionable bedside context.",
     nextLabel: "Continue to Comparative Analysis",
   },
   {
     slug: "comparative-analysis",
     title: "Comparative Analysis",
-    subtitle: "Compare scoring approaches and current model behavior side by side.",
+    subtitle:
+      "Compare scoring approaches and current model behavior side by side.",
     checkpoint: "Model comparison",
-    detail: "This route will later hold the strongest model, ensemble output, and disagreement view.",
+    detail:
+      "This route will later hold the strongest model, ensemble output, and disagreement view.",
     nextLabel: "Continue to Decision Support",
   },
   {
     slug: "decision-support",
     title: "Decision Support",
-    subtitle: "Translate the model output into recommendations, signals, consensus, and feedback.",
+    subtitle:
+      "Translate the model output into recommendations, signals, consensus, and feedback.",
     checkpoint: "Disposition and follow-up",
-    detail: "This stage turns the analysis into next-step guidance, top contributing signals, and clinician feedback.",
+    detail:
+      "This stage turns the analysis into next-step guidance, top contributing signals, and clinician feedback.",
     nextLabel: "Continue to Model Analytical Hub",
   },
   {
     slug: "backend-processing",
     title: "Backend Processing",
-    subtitle: "Show preprocessing, feature engineering, scaling, and validation steps.",
+    subtitle:
+      "Show preprocessing, feature engineering, scaling, and validation steps.",
     checkpoint: "Pipeline trace",
-    detail: "The backend view keeps the model-ready data path visible for debugging and trust.",
+    detail:
+      "The backend view keeps the model-ready data path visible for debugging and trust.",
     hidden: true,
     nextLabel: "Continue to Model Analytical Hub",
   },
   {
     slug: "model-analytical-hub",
     title: "Model Hub",
-    subtitle: "Review every trained model grouped by machine learning and deep learning families.",
+    subtitle:
+      "Review every trained model grouped by machine learning and deep learning families.",
     checkpoint: "Final review",
-    detail: "This is the final stop in the flow and now hosts the trained model inventory and family breakdown.",
+    detail:
+      "This is the final stop in the flow and now hosts the trained model inventory and family breakdown.",
     nextLabel: "Review flow completion",
   },
 ];
 
 const visibleFlowSteps = flowSteps.filter((step) => !step.hidden);
-const stepIndexBySlug = new Map(visibleFlowSteps.map((step, index) => [step.slug, index]));
+const stepIndexBySlug = new Map(
+  visibleFlowSteps.map((step, index) => [step.slug, index]),
+);
 const firstStepSlug = visibleFlowSteps[0].slug;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -122,7 +135,12 @@ const labFieldSpecs = [
     panel: "diabetes",
     unit: "mg/dL",
     hint: "Usually under 140",
-    aliases: ["postprandial glucose", "pp glucose", "ppbs", "post meal glucose"],
+    aliases: [
+      "postprandial glucose",
+      "pp glucose",
+      "ppbs",
+      "post meal glucose",
+    ],
     defaultValue: "208",
   },
   {
@@ -290,12 +308,20 @@ const labFieldSpecs = [
 ];
 
 const labPanels = [
-  { key: "diabetes", label: "Diabetes", description: "Glucose control and HbA1c" },
+  {
+    key: "diabetes",
+    label: "Diabetes",
+    description: "Glucose control and HbA1c",
+  },
   { key: "blood", label: "Blood", description: "CBC and hematology" },
   { key: "lipid", label: "Lipid", description: "Cardiovascular risk" },
   { key: "liver", label: "Liver", description: "Hepatic enzymes and proteins" },
   { key: "kidney", label: "Kidney", description: "Renal function" },
-  { key: "electrolytes", label: "Electrolytes", description: "Core chemistry balance" },
+  {
+    key: "electrolytes",
+    label: "Electrolytes",
+    description: "Core chemistry balance",
+  },
 ];
 
 const comorbidityOptions = [
@@ -311,7 +337,9 @@ const comorbidityOptions = [
   "Asthma",
 ];
 
-const labDefaultValues = Object.fromEntries(labFieldSpecs.map((field) => [field.key, ""]));
+const labDefaultValues = Object.fromEntries(
+  labFieldSpecs.map((field) => [field.key, ""]),
+);
 
 const requiredLabFieldKeys = new Set();
 
@@ -328,7 +356,10 @@ const labSchema = z.object(
         : z
             .string()
             .trim()
-            .refine((value) => value === "" || !Number.isNaN(Number(value)), "Enter a number"),
+            .refine(
+              (value) => value === "" || !Number.isNaN(Number(value)),
+              "Enter a number",
+            ),
     ]),
   ),
 );
@@ -360,16 +391,116 @@ const initialAnalysisState = {
 };
 
 const analysisModelCatalog = [
-  { key: "isolation-forest", name: "Isolation Forest", accuracy: 0.84, precision: 0.81, recall: 0.79, f1: 0.80, auc: 0.86, latencyMs: 6.2, memoryMb: 92 },
-  { key: "one-class-svm", name: "One-Class SVM", accuracy: 0.79, precision: 0.77, recall: 0.73, f1: 0.75, auc: 0.82, latencyMs: 8.4, memoryMb: 74 },
-  { key: "local-outlier-factor", name: "Local Outlier Factor", accuracy: 0.81, precision: 0.78, recall: 0.75, f1: 0.76, auc: 0.84, latencyMs: 7.1, memoryMb: 81 },
-  { key: "autoencoder", name: "Autoencoder", accuracy: 0.86, precision: 0.84, recall: 0.81, f1: 0.82, auc: 0.88, latencyMs: 5.4, memoryMb: 96 },
-  { key: "anomaly-transformer", name: "Anomaly Transformer", accuracy: 0.88, precision: 0.86, recall: 0.82, f1: 0.84, auc: 0.90, latencyMs: 7.8, memoryMb: 108 },
-  { key: "variational-autoencoder", name: "Variational Autoencoder", accuracy: 0.87, precision: 0.85, recall: 0.83, f1: 0.84, auc: 0.89, latencyMs: 6.0, memoryMb: 99 },
-  { key: "ganomaly", name: "GANomaly", accuracy: 0.87, precision: 0.84, recall: 0.82, f1: 0.83, auc: 0.89, latencyMs: 8.1, memoryMb: 104 },
-  { key: "cnn-autoencoder", name: "CNN Autoencoder", accuracy: 0.85, precision: 0.83, recall: 0.80, f1: 0.81, auc: 0.87, latencyMs: 9.1, memoryMb: 111 },
-  { key: "deep-svdd", name: "Deep SVDD", accuracy: 0.86, precision: 0.84, recall: 0.81, f1: 0.82, auc: 0.88, latencyMs: 6.5, memoryMb: 95 },
-  { key: "ensemble", name: "Ensemble", accuracy: 0.91, precision: 0.89, recall: 0.87, f1: 0.88, auc: 0.94, latencyMs: 10.2, memoryMb: 122 },
+  {
+    key: "isolation-forest",
+    name: "Isolation Forest",
+    accuracy: 0.84,
+    precision: 0.81,
+    recall: 0.79,
+    f1: 0.8,
+    auc: 0.86,
+    latencyMs: 6.2,
+    memoryMb: 92,
+  },
+  {
+    key: "one-class-svm",
+    name: "One-Class SVM",
+    accuracy: 0.79,
+    precision: 0.77,
+    recall: 0.73,
+    f1: 0.75,
+    auc: 0.82,
+    latencyMs: 8.4,
+    memoryMb: 74,
+  },
+  {
+    key: "local-outlier-factor",
+    name: "Local Outlier Factor",
+    accuracy: 0.81,
+    precision: 0.78,
+    recall: 0.75,
+    f1: 0.76,
+    auc: 0.84,
+    latencyMs: 7.1,
+    memoryMb: 81,
+  },
+  {
+    key: "autoencoder",
+    name: "Autoencoder",
+    accuracy: 0.86,
+    precision: 0.84,
+    recall: 0.81,
+    f1: 0.82,
+    auc: 0.88,
+    latencyMs: 5.4,
+    memoryMb: 96,
+  },
+  {
+    key: "anomaly-transformer",
+    name: "Anomaly Transformer",
+    accuracy: 0.88,
+    precision: 0.86,
+    recall: 0.82,
+    f1: 0.84,
+    auc: 0.9,
+    latencyMs: 7.8,
+    memoryMb: 108,
+  },
+  {
+    key: "variational-autoencoder",
+    name: "Variational Autoencoder",
+    accuracy: 0.87,
+    precision: 0.85,
+    recall: 0.83,
+    f1: 0.84,
+    auc: 0.89,
+    latencyMs: 6.0,
+    memoryMb: 99,
+  },
+  {
+    key: "ganomaly",
+    name: "GANomaly",
+    accuracy: 0.87,
+    precision: 0.84,
+    recall: 0.82,
+    f1: 0.83,
+    auc: 0.89,
+    latencyMs: 8.1,
+    memoryMb: 104,
+  },
+  {
+    key: "cnn-autoencoder",
+    name: "CNN Autoencoder",
+    accuracy: 0.85,
+    precision: 0.83,
+    recall: 0.8,
+    f1: 0.81,
+    auc: 0.87,
+    latencyMs: 9.1,
+    memoryMb: 111,
+  },
+  {
+    key: "deep-svdd",
+    name: "Deep SVDD",
+    accuracy: 0.86,
+    precision: 0.84,
+    recall: 0.81,
+    f1: 0.82,
+    auc: 0.88,
+    latencyMs: 6.5,
+    memoryMb: 95,
+  },
+  {
+    key: "ensemble",
+    name: "Ensemble",
+    accuracy: 0.91,
+    precision: 0.89,
+    recall: 0.87,
+    f1: 0.88,
+    auc: 0.94,
+    latencyMs: 10.2,
+    memoryMb: 122,
+  },
 ];
 
 const emptyPatientState = {
@@ -461,10 +592,14 @@ function PatientProvider({ children }) {
     ...initialAnalysisState,
   });
   const [modelConfigHydrated, setModelConfigHydrated] = React.useState(false);
-  const [modelConfigSaveState, setModelConfigSaveState] = React.useState("loading");
+  const [modelConfigSaveState, setModelConfigSaveState] =
+    React.useState("loading");
   const lastSavedModelConfigRef = React.useRef("");
 
-  const serializeStackingConfig = React.useCallback((config) => JSON.stringify(config), []);
+  const serializeStackingConfig = React.useCallback(
+    (config) => JSON.stringify(config),
+    [],
+  );
 
   const applyLoadedModelConfig = React.useCallback((config) => {
     if (!config || typeof config !== "object") {
@@ -479,15 +614,37 @@ function PatientProvider({ children }) {
       ...current,
       modelTuning: {
         ...current.modelTuning,
-        stackingMetaModelType: String(config.stacking_meta_model_type || current.modelTuning.stackingMetaModelType || "mlp"),
-        stackingHiddenLayerSizes: hiddenLayerSizes,
-        stackingAlpha: String(config.stacking_alpha ?? current.modelTuning.stackingAlpha ?? "0.0001"),
-        stackingLearningRateInit: String(
-          config.stacking_learning_rate_init ?? current.modelTuning.stackingLearningRateInit ?? "0.001",
+        stackingMetaModelType: String(
+          config.stacking_meta_model_type ||
+            current.modelTuning.stackingMetaModelType ||
+            "mlp",
         ),
-        stackingMaxIter: String(config.stacking_max_iter ?? current.modelTuning.stackingMaxIter ?? "500"),
-        stackingRandomState: String(config.stacking_random_state ?? current.modelTuning.stackingRandomState ?? "42"),
-        stackingVerbose: Boolean(config.stacking_verbose ?? current.modelTuning.stackingVerbose ?? false),
+        stackingHiddenLayerSizes: hiddenLayerSizes,
+        stackingAlpha: String(
+          config.stacking_alpha ??
+            current.modelTuning.stackingAlpha ??
+            "0.0001",
+        ),
+        stackingLearningRateInit: String(
+          config.stacking_learning_rate_init ??
+            current.modelTuning.stackingLearningRateInit ??
+            "0.001",
+        ),
+        stackingMaxIter: String(
+          config.stacking_max_iter ??
+            current.modelTuning.stackingMaxIter ??
+            "500",
+        ),
+        stackingRandomState: String(
+          config.stacking_random_state ??
+            current.modelTuning.stackingRandomState ??
+            "42",
+        ),
+        stackingVerbose: Boolean(
+          config.stacking_verbose ??
+          current.modelTuning.stackingVerbose ??
+          false,
+        ),
       },
       backendProcessing: {
         ...current.backendProcessing,
@@ -507,7 +664,9 @@ function PatientProvider({ children }) {
   }, []);
 
   const markStepComplete = React.useCallback((slug) => {
-    setCompletedSteps((current) => (current.includes(slug) ? current : [...current, slug]));
+    setCompletedSteps((current) =>
+      current.includes(slug) ? current : [...current, slug],
+    );
   }, []);
 
   const markStepIncomplete = React.useCallback((slug) => {
@@ -518,7 +677,9 @@ function PatientProvider({ children }) {
     setPatient(emptyPatientState);
     setCompletedSteps([]);
     setModelResults({ ...initialAnalysisState });
-    lastSavedModelConfigRef.current = serializeStackingConfig(buildStackingConfig({ modelTuning: emptyPatientState.modelTuning }));
+    lastSavedModelConfigRef.current = serializeStackingConfig(
+      buildStackingConfig({ modelTuning: emptyPatientState.modelTuning }),
+    );
   }, []);
 
   React.useEffect(() => {
@@ -531,7 +692,9 @@ function PatientProvider({ children }) {
           return;
         }
         if (response.data?.config) {
-          lastSavedModelConfigRef.current = serializeStackingConfig(response.data.config);
+          lastSavedModelConfigRef.current = serializeStackingConfig(
+            response.data.config,
+          );
           applyLoadedModelConfig(response.data.config);
           setModelConfigHydrated(true);
           setModelConfigSaveState("saved");
@@ -545,7 +708,11 @@ function PatientProvider({ children }) {
         const fallback = window.localStorage.getItem("latest-model-config");
         if (!fallback || cancelled) {
           if (!cancelled) {
-            lastSavedModelConfigRef.current = serializeStackingConfig(buildStackingConfig({ modelTuning: emptyPatientState.modelTuning }));
+            lastSavedModelConfigRef.current = serializeStackingConfig(
+              buildStackingConfig({
+                modelTuning: emptyPatientState.modelTuning,
+              }),
+            );
             setModelConfigHydrated(true);
             setModelConfigSaveState("saved");
           }
@@ -553,7 +720,8 @@ function PatientProvider({ children }) {
         }
         try {
           const parsedFallback = JSON.parse(fallback);
-          lastSavedModelConfigRef.current = serializeStackingConfig(parsedFallback);
+          lastSavedModelConfigRef.current =
+            serializeStackingConfig(parsedFallback);
           applyLoadedModelConfig(parsedFallback);
           setModelConfigSaveState("local");
         } catch (error) {
@@ -563,10 +731,14 @@ function PatientProvider({ children }) {
 
       if (!cancelled) {
         if (!lastSavedModelConfigRef.current) {
-          lastSavedModelConfigRef.current = serializeStackingConfig(buildStackingConfig({ modelTuning: emptyPatientState.modelTuning }));
+          lastSavedModelConfigRef.current = serializeStackingConfig(
+            buildStackingConfig({ modelTuning: emptyPatientState.modelTuning }),
+          );
         }
         setModelConfigHydrated(true);
-        setModelConfigSaveState((current) => (current === "loading" ? "saved" : current));
+        setModelConfigSaveState((current) =>
+          current === "loading" ? "saved" : current,
+        );
       }
     };
 
@@ -633,10 +805,21 @@ function PatientProvider({ children }) {
       resetFlow,
       highestUnlockedIndex: getHighestUnlockedIndex(completedSteps),
     }),
-    [completedSteps, modelConfigSaveState, modelResults, markStepComplete, markStepIncomplete, resetFlow, updateSection, patient],
+    [
+      completedSteps,
+      modelConfigSaveState,
+      modelResults,
+      markStepComplete,
+      markStepIncomplete,
+      resetFlow,
+      updateSection,
+      patient,
+    ],
   );
 
-  return <PatientContext.Provider value={value}>{children}</PatientContext.Provider>;
+  return (
+    <PatientContext.Provider value={value}>{children}</PatientContext.Provider>
+  );
 }
 
 function usePatient() {
@@ -654,7 +837,8 @@ function StepGuard() {
 function AppShell() {
   const { completedSteps } = usePatient();
   const location = useLocation();
-  const currentSlug = location.pathname.split("/").filter(Boolean)[0] || firstStepSlug;
+  const currentSlug =
+    location.pathname.split("/").filter(Boolean)[0] || firstStepSlug;
   const currentStep = flowSteps[stepIndexBySlug.get(currentSlug) ?? 0];
   const topbarRef = React.useRef(null);
   const [theme, setTheme] = React.useState(() => {
@@ -671,13 +855,17 @@ function AppShell() {
 
     const root = document.documentElement;
     const updateTopbarHeight = () => {
-      const topbarHeight = topbarRef.current?.getBoundingClientRect().height ?? 0;
+      const topbarHeight =
+        topbarRef.current?.getBoundingClientRect().height ?? 0;
       root.style.setProperty("--topbar-height", `${Math.ceil(topbarHeight)}px`);
     };
 
     updateTopbarHeight();
 
-    const observer = typeof ResizeObserver !== "undefined" && topbarRef.current ? new ResizeObserver(updateTopbarHeight) : null;
+    const observer =
+      typeof ResizeObserver !== "undefined" && topbarRef.current
+        ? new ResizeObserver(updateTopbarHeight)
+        : null;
     if (observer && topbarRef.current) {
       observer.observe(topbarRef.current);
     }
@@ -700,13 +888,17 @@ function AppShell() {
 
   return (
     <div className="app-shell mx-auto min-h-screen w-[min(1440px,calc(100vw-32px))] py-7 pb-12">
-      <header ref={topbarRef} className="topbar flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+      <header
+        ref={topbarRef}
+        className="topbar flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between"
+      >
         <div>
-          <h1 className="eyebrow">Heathcare Anomaly Detection Dashboard</h1>
-          
+          <h1 className="eyebrow">Healthcare Anomaly Detection Dashboard</h1>
+
           <p className="lede">
-            The active page stays focused on the current clinical step, with Back and Continue controls inside each
-            page rather than a separate roadmap screen.
+            The active page stays focused on the current clinical step, with
+            Back and Continue controls inside each page rather than a separate
+            roadmap screen.
           </p>
         </div>
         <div className="topbar__status">
@@ -716,14 +908,22 @@ function AppShell() {
           </div>
           <div className="status-chip">
             <span>Workflow state</span>
-            <strong>{completedSteps.length ? `${completedSteps.length} completed` : "Ready to start"}</strong>
+            <strong>
+              {completedSteps.length
+                ? `${completedSteps.length} completed`
+                : "Ready to start"}
+            </strong>
           </div>
           <button
             type="button"
             className="theme-toggle"
-            onClick={() => setTheme((current) => (current === "day" ? "night" : "day"))}
+            onClick={() =>
+              setTheme((current) => (current === "day" ? "night" : "day"))
+            }
             aria-pressed={theme === "night"}
-            aria-label={theme === "night" ? "Switch to day mode" : "Switch to night mode"}
+            aria-label={
+              theme === "night" ? "Switch to day mode" : "Switch to night mode"
+            }
           >
             <span>Night mode</span>
             <strong>{theme === "night" ? "On" : "Off"}</strong>
@@ -747,7 +947,8 @@ function StepLayout({
   showContinueButton = true,
 }) {
   const navigate = useNavigate();
-  const { completedSteps, markStepComplete, highestUnlockedIndex } = usePatient();
+  const { completedSteps, markStepComplete, highestUnlockedIndex } =
+    usePatient();
   const stepIndex = stepIndexBySlug.get(step.slug) ?? 0;
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === visibleFlowSteps.length - 1;
@@ -792,7 +993,9 @@ function StepLayout({
           <p className="lede">{step.subtitle}</p>
         </div>
         <div className="flow-page__actions flex flex-wrap items-center gap-3">
-          <span className="status-pill">{isComplete ? "Marked complete" : "In progress"}</span>
+          <span className="status-pill">
+            {isComplete ? "Marked complete" : "In progress"}
+          </span>
           <button
             type="button"
             className="button button--ghost"
@@ -819,7 +1022,11 @@ function StepLayout({
       {children}
       {showBackToTop ? (
         <div className="back-to-top-float">
-          <button type="button" className="button button--ghost back-to-top-float__button" onClick={handleBackToTop}>
+          <button
+            type="button"
+            className="button button--ghost back-to-top-float__button"
+            onClick={handleBackToTop}
+          >
             Back to top
           </button>
         </div>
@@ -830,7 +1037,9 @@ function StepLayout({
 
 function PageCard({ title, eyebrow, children, compact = false, wide = false }) {
   return (
-    <article className={`card grid gap-4${compact ? " card--compact" : ""}${wide ? " card--wide" : ""}`}>
+    <article
+      className={`card grid gap-4${compact ? " card--compact" : ""}${wide ? " card--wide" : ""}`}
+    >
       <p className="eyebrow">{eyebrow}</p>
       <h3>{title}</h3>
       <div className="card__body">{children}</div>
@@ -860,8 +1069,14 @@ function StepSkeleton({
       nextDisabled={nextDisabled}
       onNext={onNext}
     >
-      <div className={`step-shell-grid${gridClassName ? ` ${gridClassName}` : ""}`}>
-        <PageCard title="Primary workspace" eyebrow="Active area" wide={!hasRightCard}>
+      <div
+        className={`step-shell-grid${gridClassName ? ` ${gridClassName}` : ""}`}
+      >
+        <PageCard
+          title="Primary workspace"
+          eyebrow="Active area"
+          wide={!hasRightCard}
+        >
           {left}
         </PageCard>
         {hasRightCard ? (
@@ -874,15 +1089,25 @@ function StepSkeleton({
   );
 }
 
-function SectionCard({ title, eyebrow, description, children, compact = false }) {
+function SectionCard({
+  title,
+  eyebrow,
+  description,
+  children,
+  compact = false,
+}) {
   return (
-    <section className={`section-card grid gap-4${compact ? " section-card--compact" : ""}`}>
+    <section
+      className={`section-card grid gap-4${compact ? " section-card--compact" : ""}`}
+    >
       <div className="section-card__head">
         <div>
           <p className="eyebrow">{eyebrow}</p>
           <h3>{title}</h3>
         </div>
-        {description ? <p className="section-card__description">{description}</p> : null}
+        {description ? (
+          <p className="section-card__description">{description}</p>
+        ) : null}
       </div>
       <div className="section-card__body">{children}</div>
     </section>
@@ -891,7 +1116,10 @@ function SectionCard({ title, eyebrow, description, children, compact = false })
 
 function CompletionRing({ value }) {
   return (
-    <span className="completion-ring" style={{ "--ring-fill": `${Math.max(0, Math.min(100, value)) * 3.6}deg` }}>
+    <span
+      className="completion-ring"
+      style={{ "--ring-fill": `${Math.max(0, Math.min(100, value)) * 3.6}deg` }}
+    >
       <span className="completion-ring__value">{value}%</span>
     </span>
   );
@@ -907,15 +1135,23 @@ function Step1ReferenceAreaCard({
 }) {
   return (
     <div className="stack">
-      <section className={`intake-summary-card${intakeReady ? " is-ready" : ""}`}>
+      <section
+        className={`intake-summary-card${intakeReady ? " is-ready" : ""}`}
+      >
         <div className="viz-card__head">
           <div>
             <strong>Mandatory Fields</strong>
             <p>Completion value for the required intake fields.</p>
           </div>
-          <span className={`status-pill${intakeReady ? "" : " status-pill--locked"}`}>
+          <span
+            className={`status-pill${intakeReady ? "" : " status-pill--locked"}`}
+          >
             <CompletionRing value={completionPercentage} />
-            <span>{intakeReady ? "Ready to continue" : `${missingRequiredFields.length} missing`}</span>
+            <span>
+              {intakeReady
+                ? "Ready to continue"
+                : `${missingRequiredFields.length} missing`}
+            </span>
           </span>
         </div>
         <div className="intake-summary-grid">
@@ -949,8 +1185,21 @@ function Step1ReferenceAreaCard({
   );
 }
 
-function LabReferenceAreaCard({ missingFields, isValid, uploadState, totalFields }) {
-  const completionPercentage = Math.max(0, Math.min(100, Math.round(((totalFields - missingFields) / Math.max(totalFields, 1)) * 100)));
+function LabReferenceAreaCard({
+  missingFields,
+  isValid,
+  uploadState,
+  totalFields,
+}) {
+  const completionPercentage = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        ((totalFields - missingFields) / Math.max(totalFields, 1)) * 100,
+      ),
+    ),
+  );
 
   return (
     <div className="stack">
@@ -958,11 +1207,18 @@ function LabReferenceAreaCard({ missingFields, isValid, uploadState, totalFields
         <div className="viz-card__head">
           <div>
             <strong>Validation and hints</strong>
-            <p>Required fields are checked before Next. Range hints turn green when values are in range and amber when they are not.</p>
+            <p>
+              Required fields are checked before Next. Range hints turn green
+              when values are in range and amber when they are not.
+            </p>
           </div>
-          <span className={`status-pill${isValid ? "" : " status-pill--locked"}`}>
+          <span
+            className={`status-pill${isValid ? "" : " status-pill--locked"}`}
+          >
             <CompletionRing value={completionPercentage} />
-            <span>{isValid ? "Ready to continue" : `${missingFields} missing`}</span>
+            <span>
+              {isValid ? "Ready to continue" : `${missingFields} missing`}
+            </span>
           </span>
         </div>
         <div className="intake-summary-grid">
@@ -987,7 +1243,10 @@ function LabReferenceAreaCard({ missingFields, isValid, uploadState, totalFields
 
       <section className="callout callout--soft">
         <strong>What happens after labs</strong>
-        <p>Once the form passes validation, the next step can use the normalized lab state without re-entry.</p>
+        <p>
+          Once the form passes validation, the next step can use the normalized
+          lab state without re-entry.
+        </p>
       </section>
     </div>
   );
@@ -1048,7 +1307,11 @@ function ComparisonReferenceAreaCard({
           </div>
           <div className="callout callout--soft">
             <strong>Interpretation</strong>
-            <p>{analysisReady ? "The deployment choice balances score with latency and memory pressure." : "Run the anomaly test to reveal deployment tradeoffs."}</p>
+            <p>
+              {analysisReady
+                ? "The deployment choice balances score with latency and memory pressure."
+                : "Run the anomaly test to reveal deployment tradeoffs."}
+            </p>
           </div>
         </div>
       </AnalysisSection>
@@ -1066,7 +1329,11 @@ function ComparisonReferenceAreaCard({
           </div>
           <div className="summary-pill">
             <span>Score</span>
-            <strong>{analysisReady ? `${Math.round((bestModel?.score ?? 0) * 100)}%` : "0%"}</strong>
+            <strong>
+              {analysisReady
+                ? `${Math.round((bestModel?.score ?? 0) * 100)}%`
+                : "0%"}
+            </strong>
           </div>
         </div>
       </AnalysisSection>
@@ -1090,14 +1357,23 @@ function NumberSummary({ label, value, suffix }) {
   );
 }
 
-function AnalysisSection({ unlocked, eyebrow, title, description, lockMessage, children }) {
+function AnalysisSection({
+  unlocked,
+  eyebrow,
+  title,
+  description,
+  lockMessage,
+  children,
+}) {
   return (
     <section className={`analysis-section${unlocked ? "" : " is-locked"}`}>
       <div className="section-card__head">
         <div>
           <p className="eyebrow">{eyebrow}</p>
           <h3>{title}</h3>
-          {description ? <p className="section-card__description">{description}</p> : null}
+          {description ? (
+            <p className="section-card__description">{description}</p>
+          ) : null}
         </div>
       </div>
       {unlocked ? (
@@ -1112,9 +1388,19 @@ function AnalysisSection({ unlocked, eyebrow, title, description, lockMessage, c
   );
 }
 
-function GraphPanel({ title, subtitle, items, valueKey, valueLabel, reverse = false }) {
+function GraphPanel({
+  title,
+  subtitle,
+  items,
+  valueKey,
+  valueLabel,
+  reverse = false,
+}) {
   const safeItems = safeArray(items);
-  const maxValue = Math.max(...safeItems.map((item) => parseNumeric(item?.[valueKey] ?? 0)), 1);
+  const maxValue = Math.max(
+    ...safeItems.map((item) => parseNumeric(item?.[valueKey] ?? 0)),
+    1,
+  );
 
   return (
     <div className="graph-panel">
@@ -1128,17 +1414,28 @@ function GraphPanel({ title, subtitle, items, valueKey, valueLabel, reverse = fa
       <div className="graph-panel__bars">
         {safeItems.map((item) => {
           const value = parseNumeric(item?.[valueKey] ?? 0);
-          const width = reverse ? (1 - value / maxValue) * 100 : (value / maxValue) * 100;
+          const width = reverse
+            ? (1 - value / maxValue) * 100
+            : (value / maxValue) * 100;
           const barWidth = value <= 0 ? 0 : Math.max(8, width);
           return (
-            <div key={item?.key || item?.label || item?.name} className="graph-panel__row">
-              <div className="graph-panel__label">{item?.name || item?.label || "Unknown"}</div>
+            <div
+              key={item?.key || item?.label || item?.name}
+              className="graph-panel__row"
+            >
+              <div className="graph-panel__label">
+                {item?.name || item?.label || "Unknown"}
+              </div>
               <div className="bar">
                 <span style={{ width: `${barWidth}%` }} />
               </div>
               <div className="graph-panel__value">
                 {value}
-                {valueKey === "latencyMs" ? " ms" : valueKey === "memoryMb" ? " MB" : ""}
+                {valueKey === "latencyMs"
+                  ? " ms"
+                  : valueKey === "memoryMb"
+                    ? " MB"
+                    : ""}
               </div>
             </div>
           );
@@ -1156,8 +1453,11 @@ function AnomalyTrendChart({ series, score, riskLevel }) {
   const minValue = 0;
   const maxValue = 1;
   const points = safeSeries.map((point, index) => {
-    const x = padding + (index / Math.max(safeSeries.length - 1, 1)) * (width - padding * 2);
-    const normalized = (parseNumeric(point?.score ?? 0) - minValue) / (maxValue - minValue);
+    const x =
+      padding +
+      (index / Math.max(safeSeries.length - 1, 1)) * (width - padding * 2);
+    const normalized =
+      (parseNumeric(point?.score ?? 0) - minValue) / (maxValue - minValue);
     const y = height - padding - normalized * (height - padding * 2);
     return { ...point, x, y };
   });
@@ -1174,15 +1474,30 @@ function AnomalyTrendChart({ series, score, riskLevel }) {
         </div>
         <span>{riskLevel}</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="viz-svg" role="img" aria-label="Anomaly score trend chart">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="viz-svg"
+        role="img"
+        aria-label="Anomaly score trend chart"
+      >
         <defs>
           <linearGradient id="trendFill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="rgba(114,215,255,0.36)" />
             <stop offset="100%" stopColor="rgba(114,215,255,0.02)" />
           </linearGradient>
         </defs>
-        <line x1={padding} x2={width - padding} y1={thresholdY} y2={thresholdY} className="viz-threshold" />
-        <text x={width - padding} y={thresholdY - 6} className="viz-label viz-label--threshold">
+        <line
+          x1={padding}
+          x2={width - padding}
+          y1={thresholdY}
+          y2={thresholdY}
+          className="viz-threshold"
+        />
+        <text
+          x={width - padding}
+          y={thresholdY - 6}
+          className="viz-label viz-label--threshold"
+        >
           Alert threshold
         </text>
         <path d={areaPath} className="viz-area" fill="url(#trendFill)" />
@@ -1217,7 +1532,10 @@ function RadarChart({ metrics }) {
   const centerX = width / 2;
   const centerY = height / 2;
   const radius = 112;
-  const angles = safeMetrics.map((_, index) => (-Math.PI / 2) + (index / Math.max(safeMetrics.length, 1)) * Math.PI * 2);
+  const angles = safeMetrics.map(
+    (_, index) =>
+      -Math.PI / 2 + (index / Math.max(safeMetrics.length, 1)) * Math.PI * 2,
+  );
   const polygon = safeMetrics
     .map((metric, index) => {
       const value = clamp(parseNumeric(metric?.value ?? 0), 0, 1);
@@ -1236,9 +1554,20 @@ function RadarChart({ metrics }) {
         </div>
         <span>0 to 1</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="viz-svg viz-svg--radar" role="img" aria-label="Clinical anomaly radar chart">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="viz-svg viz-svg--radar"
+        role="img"
+        aria-label="Clinical anomaly radar chart"
+      >
         {[0.25, 0.5, 0.75, 1].map((ring) => (
-          <circle key={ring} cx={centerX} cy={centerY} r={radius * ring} className="viz-radar-ring" />
+          <circle
+            key={ring}
+            cx={centerX}
+            cy={centerY}
+            r={radius * ring}
+            className="viz-radar-ring"
+          />
         ))}
         {safeMetrics.map((metric, index) => {
           const angle = angles[index];
@@ -1248,9 +1577,19 @@ function RadarChart({ metrics }) {
           const labelY = centerY + Math.sin(angle) * (radius + 22);
           return (
             <g key={metric?.label || `metric-${index}`}>
-              <line x1={centerX} y1={centerY} x2={x} y2={y} className="viz-radar-axis" />
+              <line
+                x1={centerX}
+                y1={centerY}
+                x2={x}
+                y2={y}
+                className="viz-radar-axis"
+              />
               <circle cx={x} cy={y} r="3" className="viz-radar-dot" />
-              <text x={labelX} y={labelY} className="viz-label viz-label--radar">
+              <text
+                x={labelX}
+                y={labelY}
+                className="viz-label viz-label--radar"
+              >
                 {metric?.label || "Unknown"}
               </text>
             </g>
@@ -1262,7 +1601,9 @@ function RadarChart({ metrics }) {
         {safeMetrics.map((metric, index) => (
           <div key={metric?.label || `metric-${index}`} className="viz-meter">
             <span>{metric?.label || "Unknown"}</span>
-            <strong>{Math.round(parseNumeric(metric?.value ?? 0) * 100)}%</strong>
+            <strong>
+              {Math.round(parseNumeric(metric?.value ?? 0) * 100)}%
+            </strong>
           </div>
         ))}
       </div>
@@ -1283,7 +1624,10 @@ function HeatmapGrid({ cells }) {
       </div>
       <div className="heatmap-grid">
         {safeCells.map((cell, index) => (
-          <div key={cell?.label || `cell-${index}`} className={`heatmap-cell heatmap-cell--${cell?.tone || "moderate"}`}>
+          <div
+            key={cell?.label || `cell-${index}`}
+            className={`heatmap-cell heatmap-cell--${cell?.tone || "moderate"}`}
+          >
             <strong>{cell?.label || "Unknown"}</strong>
             <span>{Math.round(parseNumeric(cell?.value ?? 0) * 100)}%</span>
           </div>
@@ -1298,12 +1642,21 @@ function AnomalyPositionChart({ anomalies }) {
   const height = 300;
   const padding = 38;
   const safeAnomalies = safeArray(anomalies).slice(0, 14);
-  const yBands = ["Vitals", "Blood sugar", "Blood", "Lipids", "Liver", "Kidney", "Electrolytes"];
+  const yBands = [
+    "Vitals",
+    "Blood sugar",
+    "Blood",
+    "Lipids",
+    "Liver",
+    "Kidney",
+    "Electrolytes",
+  ];
   const bandIndex = new Map(yBands.map((band, index) => [band, index]));
   const points = safeAnomalies.map((item, index) => {
     const x = padding + clamp01(item.severity) * (width - padding * 2);
     const yStep = (height - padding * 2) / Math.max(yBands.length - 1, 1);
-    const y = padding + (bandIndex.get(item.domain) ?? index % yBands.length) * yStep;
+    const y =
+      padding + (bandIndex.get(item.domain) ?? index % yBands.length) * yStep;
     return {
       ...item,
       x,
@@ -1320,7 +1673,14 @@ function AnomalyPositionChart({ anomalies }) {
       return;
     }
 
-    if (!selectedPoint || !points.some((point) => point.label === selectedPoint.label && point.source === selectedPoint.source)) {
+    if (
+      !selectedPoint ||
+      !points.some(
+        (point) =>
+          point.label === selectedPoint.label &&
+          point.source === selectedPoint.source,
+      )
+    ) {
       setSelectedPoint(points[0]);
     }
   }, [points, selectedPoint]);
@@ -1330,21 +1690,45 @@ function AnomalyPositionChart({ anomalies }) {
       <div className="viz-card__head">
         <div>
           <strong>Anomaly position map</strong>
-          <p>Shows where each issue sits from low to high severity and by area.</p>
+          <p>
+            Shows where each issue sits from low to high severity and by area.
+          </p>
         </div>
         <span>{points.length} points</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="viz-svg viz-svg--position" role="img" aria-label="Anomaly position map">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="viz-svg viz-svg--position"
+        role="img"
+        aria-label="Anomaly position map"
+      >
         <defs>
           <linearGradient id="positionGridFill" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="rgba(98,212,255,0.06)" />
             <stop offset="100%" stopColor="rgba(156,241,210,0.14)" />
           </linearGradient>
         </defs>
-        <rect x={padding} y={padding} width={width - padding * 2} height={height - padding * 2} rx="18" fill="url(#positionGridFill)" stroke="rgba(185, 201, 225, 0.12)" />
+        <rect
+          x={padding}
+          y={padding}
+          width={width - padding * 2}
+          height={height - padding * 2}
+          rx="18"
+          fill="url(#positionGridFill)"
+          stroke="rgba(185, 201, 225, 0.12)"
+        />
         {[0.25, 0.5, 0.75].map((mark) => {
           const x = padding + mark * (width - padding * 2);
-          return <line key={mark} x1={x} x2={x} y1={padding} y2={height - padding} className="viz-threshold viz-threshold--soft" />;
+          return (
+            <line
+              key={mark}
+              x1={x}
+              x2={x}
+              y1={padding}
+              y2={height - padding}
+              className="viz-threshold viz-threshold--soft"
+            />
+          );
         })}
         {yBands.map((band, index) => {
           const yStep = (height - padding * 2) / Math.max(yBands.length - 1, 1);
@@ -1357,10 +1741,18 @@ function AnomalyPositionChart({ anomalies }) {
             </g>
           );
         })}
-        <text x={width - 22} y={height - 12} className="viz-label viz-label--threshold">
+        <text
+          x={width - 22}
+          y={height - 12}
+          className="viz-label viz-label--threshold"
+        >
           Higher severity
         </text>
-        <text x={padding + 2} y={height - 12} className="viz-label viz-label--axis">
+        <text
+          x={padding + 2}
+          y={height - 12}
+          className="viz-label viz-label--axis"
+        >
           Lower severity
         </text>
         {points.map((point) => (
@@ -1378,7 +1770,9 @@ function AnomalyPositionChart({ anomalies }) {
               }
             }}
           >
-            {selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source ? (
+            {selectedPoint &&
+            selectedPoint.label === point.label &&
+            selectedPoint.source === point.source ? (
               <circle
                 cx={point.x}
                 cy={point.y}
@@ -1392,13 +1786,23 @@ function AnomalyPositionChart({ anomalies }) {
               r={point.radius}
               fill={point.source === intakeSourceLabel ? "#72d7ff" : "#9cf1d2"}
               stroke={
-                selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source
+                selectedPoint &&
+                selectedPoint.label === point.label &&
+                selectedPoint.source === point.source
                   ? "rgba(255,255,255,0.18)"
                   : "rgba(7,17,29,0.92)"
               }
-              strokeWidth={selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source ? "1.5" : "2"}
+              strokeWidth={
+                selectedPoint &&
+                selectedPoint.label === point.label &&
+                selectedPoint.source === point.source
+                  ? "1.5"
+                  : "2"
+              }
             />
-            {selectedPoint && selectedPoint.label === point.label && selectedPoint.source === point.source ? (
+            {selectedPoint &&
+            selectedPoint.label === point.label &&
+            selectedPoint.source === point.source ? (
               <text
                 x={point.x + (point.x > width / 2 ? -10 : 10)}
                 y={Math.max(18, point.y - point.radius - 10)}
@@ -1437,7 +1841,11 @@ function AnomalyPositionChart({ anomalies }) {
             </div>
             <div>
               <span>Position</span>
-              <strong>{selectedPoint.source === intakeSourceLabel ? "Clinical intake & vitals" : "Laboratory results"}</strong>
+              <strong>
+                {selectedPoint.source === intakeSourceLabel
+                  ? "Clinical intake & vitals"
+                  : "Laboratory results"}
+              </strong>
             </div>
             <div>
               <span>Severity</span>
@@ -1451,8 +1859,7 @@ function AnomalyPositionChart({ anomalies }) {
 }
 
 function AnomalyBubbleCard({ anomalies }) {
-  const items = safeArray(anomalies)
-    .sort((a, b) => b.severity - a.severity);
+  const items = safeArray(anomalies).sort((a, b) => b.severity - a.severity);
 
   return (
     <div className="viz-card viz-card--recharts viz-card--compact">
@@ -1501,7 +1908,10 @@ function AnomalyRankCard({ anomalies }) {
       <div className="severity-rank-list">
         {items.length ? (
           items.map((item, index) => (
-            <div key={`${item.source}-${item.label}`} className="severity-rank-row">
+            <div
+              key={`${item.source}-${item.label}`}
+              className="severity-rank-row"
+            >
               <span className="severity-rank-row__index">{index + 1}</span>
               <div className="severity-rank-row__body">
                 <div className="severity-rank-row__label">
@@ -1509,10 +1919,16 @@ function AnomalyRankCard({ anomalies }) {
                   <span>{item.source}</span>
                 </div>
                 <div className="severity-rank-row__bar">
-                  <i style={{ width: `${Math.max(0, Math.round(clamp01(item.severity) * 100))}%` }} />
+                  <i
+                    style={{
+                      width: `${Math.max(0, Math.round(clamp01(item.severity) * 100))}%`,
+                    }}
+                  />
                 </div>
               </div>
-              <strong className="severity-rank-row__value">{Math.round(item.severity * 100)}%</strong>
+              <strong className="severity-rank-row__value">
+                {Math.round(item.severity * 100)}%
+              </strong>
             </div>
           ))
         ) : (
@@ -1548,14 +1964,35 @@ function AnomalyGaugeCard({ score, riskLevel, totalCount }) {
         </div>
         <span>{riskLevel}</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="viz-svg viz-svg--gauge" role="img" aria-label="Anomaly rate gauge">
-        <path d={`M ${arc(0)} A ${radius} ${radius} 0 0 1 ${arc(1)}`} className="viz-gauge-track" />
-        <path d={`M ${arc(0)} A ${radius} ${radius} 0 ${scoreValue >= 0.5 ? 1 : 0} 1 ${arc(scoreValue)}`} className={`viz-gauge-value viz-gauge-value--${riskLevel.toLowerCase()}`} />
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="viz-svg viz-svg--gauge"
+        role="img"
+        aria-label="Anomaly rate gauge"
+      >
+        <path
+          d={`M ${arc(0)} A ${radius} ${radius} 0 0 1 ${arc(1)}`}
+          className="viz-gauge-track"
+        />
+        <path
+          d={`M ${arc(0)} A ${radius} ${radius} 0 ${scoreValue >= 0.5 ? 1 : 0} 1 ${arc(scoreValue)}`}
+          className={`viz-gauge-value viz-gauge-value--${riskLevel.toLowerCase()}`}
+        />
         <circle cx={cx} cy={cy} r="8" className="viz-gauge-center" />
-        <text x={cx} y="112" textAnchor="middle" className="viz-label viz-label--gauge">
+        <text
+          x={cx}
+          y="112"
+          textAnchor="middle"
+          className="viz-label viz-label--gauge"
+        >
           {Math.round(scoreValue * 100)}%
         </text>
-        <text x={cx} y="136" textAnchor="middle" className="viz-label viz-label--gauge-sub">
+        <text
+          x={cx}
+          y="136"
+          textAnchor="middle"
+          className="viz-label viz-label--gauge-sub"
+        >
           anomaly rate
         </text>
       </svg>
@@ -1583,12 +2020,16 @@ function SourceSplitChart({ page1Count, page2Count }) {
       <div className="source-split">
         <div className="source-split__row">
           <span>Clinical intake & vitals</span>
-          <div className="source-split__bar"><i style={{ width: `${page1}%` }} /></div>
+          <div className="source-split__bar">
+            <i style={{ width: `${page1}%` }} />
+          </div>
           <strong>{page1Count}</strong>
         </div>
         <div className="source-split__row">
           <span>Laboratory results</span>
-          <div className="source-split__bar"><i style={{ width: `${page2}%` }} /></div>
+          <div className="source-split__bar">
+            <i style={{ width: `${page2}%` }} />
+          </div>
           <strong>{page2Count}</strong>
         </div>
       </div>
@@ -1597,7 +2038,9 @@ function SourceSplitChart({ page1Count, page2Count }) {
 }
 
 function AnomalySummaryStrip({ modelRows }) {
-  const strongest = [...modelRows].sort((a, b) => b.score - a.score).slice(0, 4);
+  const strongest = [...modelRows]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
   return (
     <div className="viz-card viz-card--strip">
       <div className="viz-card__head">
@@ -1631,9 +2074,20 @@ function ProgressComparisonCard({ beforeAfter, progression }) {
       <div className="viz-card__head">
         <div>
           <strong>Before / after comparison</strong>
-          <p>A visual change log showing where the score moved and whether the latest run is cleaner or riskier.</p>
+          <p>
+            A visual change log showing where the score moved and whether the
+            latest run is cleaner or riskier.
+          </p>
         </div>
-        <span className={improving ? "viz-tag viz-tag--good" : worsening ? "viz-tag viz-tag--warn" : "viz-tag"}>
+        <span
+          className={
+            improving
+              ? "viz-tag viz-tag--good"
+              : worsening
+                ? "viz-tag viz-tag--warn"
+                : "viz-tag"
+          }
+        >
           {beforeAfter?.direction || "baseline"}
         </span>
       </div>
@@ -1650,29 +2104,51 @@ function ProgressComparisonCard({ beforeAfter, progression }) {
         </div>
         <div className="comparison-highlight">
           <span>Shift</span>
-          <strong className={improving ? "text-good" : worsening ? "text-warn" : ""}>{delta > 0 ? "+" : ""}{delta.toFixed(2)}</strong>
-          <small>{improving ? "Cleaner than the previous run." : worsening ? "Stronger anomaly signal than before." : "No change between runs."}</small>
+          <strong
+            className={improving ? "text-good" : worsening ? "text-warn" : ""}
+          >
+            {delta > 0 ? "+" : ""}
+            {delta.toFixed(2)}
+          </strong>
+          <small>
+            {improving
+              ? "Cleaner than the previous run."
+              : worsening
+                ? "Stronger anomaly signal than before."
+                : "No change between runs."}
+          </small>
         </div>
       </div>
       <div className="compare-bridge">
         <div className="compare-bridge__rail">
           <span className="compare-bridge__label">Previous</span>
-          <div className="compare-bridge__bar compare-bridge__bar--before" style={{ width: `${Math.max(10, Math.round(beforeScore * 100))}%` }} />
+          <div
+            className="compare-bridge__bar compare-bridge__bar--before"
+            style={{ width: `${Math.max(10, Math.round(beforeScore * 100))}%` }}
+          />
         </div>
         <div className="compare-bridge__arrow">→</div>
         <div className="compare-bridge__rail">
           <span className="compare-bridge__label">Current</span>
-          <div className="compare-bridge__bar compare-bridge__bar--after" style={{ width: `${Math.max(10, Math.round(afterScore * 100))}%` }} />
+          <div
+            className="compare-bridge__bar compare-bridge__bar--after"
+            style={{ width: `${Math.max(10, Math.round(afterScore * 100))}%` }}
+          />
         </div>
       </div>
       <div className="compare-grid">
         {progression.map((item) => (
-          <div key={item.label} className={`compare-card compare-card--${item.tone}`}>
+          <div
+            key={item.label}
+            className={`compare-card compare-card--${item.tone}`}
+          >
             <span>{item.label}</span>
             <strong>{Math.round(item.score * 100)}%</strong>
             <p>{item.riskLevel}</p>
             <div className="compare-card__bar">
-              <i style={{ width: `${Math.round(clamp01(item.score) * 100)}%` }} />
+              <i
+                style={{ width: `${Math.round(clamp01(item.score) * 100)}%` }}
+              />
             </div>
           </div>
         ))}
@@ -1680,7 +2156,9 @@ function ProgressComparisonCard({ beforeAfter, progression }) {
       <div className="compare-footer">
         <div>
           <span>Delta</span>
-          <strong className={improving ? "text-good" : worsening ? "text-warn" : ""}>
+          <strong
+            className={improving ? "text-good" : worsening ? "text-warn" : ""}
+          >
             {delta > 0 ? "+" : ""}
             {delta.toFixed(2)}
           </strong>
@@ -1716,11 +2194,20 @@ function ProgressTrendChart({ history, currentScore }) {
       <div className="viz-card__head">
         <div>
           <strong>Risk progression</strong>
-          <p>Repeated runs chart the anomaly score across the patient journey.</p>
+          <p>
+            Repeated runs chart the anomaly score across the patient journey.
+          </p>
         </div>
-        <span>{history.length} run{history.length === 1 ? "" : "s"}</span>
+        <span>
+          {history.length} run{history.length === 1 ? "" : "s"}
+        </span>
       </div>
-      <svg viewBox="0 0 640 240" className="viz-svg" role="img" aria-label="Risk progression chart">
+      <svg
+        viewBox="0 0 640 240"
+        className="viz-svg"
+        role="img"
+        aria-label="Risk progression chart"
+      >
         <line x1="28" x2="612" y1="54" y2="54" className="viz-threshold" />
         <text x="612" y="46" className="viz-label viz-label--threshold">
           70% risk line
@@ -1734,9 +2221,21 @@ function ProgressTrendChart({ history, currentScore }) {
             </text>
           </g>
         ))}
-        {lastPoint ? <circle cx={lastPoint.x} cy={lastPoint.y} r="7" className="viz-point viz-point--current" /> : null}
+        {lastPoint ? (
+          <circle
+            cx={lastPoint.x}
+            cy={lastPoint.y}
+            r="7"
+            className="viz-point viz-point--current"
+          />
+        ) : null}
         {previousPoint && previousPoint !== lastPoint ? (
-          <circle cx={previousPoint.x} cy={previousPoint.y} r="6" className="viz-point viz-point--previous" />
+          <circle
+            cx={previousPoint.x}
+            cy={previousPoint.y}
+            r="6"
+            className="viz-point viz-point--previous"
+          />
         ) : null}
       </svg>
       <div className="viz-foot">
@@ -1771,9 +2270,22 @@ function RechartsTrendCard({ series, score, riskLevel, loading }) {
                 <stop offset="95%" stopColor="#72d7ff" stopOpacity={0.04} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
-            <XAxis dataKey="label" stroke="#9fb2ca" tickLine={false} axisLine={false} />
-            <YAxis stroke="#9fb2ca" tickLine={false} axisLine={false} domain={[0, 1]} />
+            <CartesianGrid
+              stroke="rgba(185, 201, 225, 0.12)"
+              strokeDasharray="4 4"
+            />
+            <XAxis
+              dataKey="label"
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+              domain={[0, 1]}
+            />
             <Tooltip
               contentStyle={{
                 background: "rgba(10, 17, 29, 0.96)",
@@ -1820,8 +2332,15 @@ function RechartsRadarCard({ metrics, loading }) {
         <ResponsiveContainer width="100%" height={280}>
           <RechartsRadarChart data={chartData}>
             <PolarGrid stroke="rgba(185, 201, 225, 0.12)" />
-            <PolarAngleAxis dataKey="label" tick={{ fill: "#a2b4cb", fontSize: 11 }} />
-            <PolarRadiusAxis angle={30} domain={[0, 1]} tick={{ fill: "#a2b4cb", fontSize: 10 }} />
+            <PolarAngleAxis
+              dataKey="label"
+              tick={{ fill: "#a2b4cb", fontSize: 11 }}
+            />
+            <PolarRadiusAxis
+              angle={30}
+              domain={[0, 1]}
+              tick={{ fill: "#a2b4cb", fontSize: 10 }}
+            />
             <Radar
               dataKey="value"
               stroke="#f4a261"
@@ -1843,7 +2362,12 @@ function RechartsRadarCard({ metrics, loading }) {
   );
 }
 
-function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair }) {
+function RechartsShapCard({
+  features,
+  interactionHeatmap,
+  loading,
+  onSelectPair,
+}) {
   const chartData = features.map((feature) => ({
     name: feature.feature || feature.label,
     value: feature.contribution ?? feature.value ?? 0,
@@ -1853,14 +2377,25 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
     normalizeShapInteractionHeatmap(interactionHeatmap) ||
     buildFallbackShapInteractionHeatmap(features);
   const displayLimit = Math.min(normalizedHeatmap.featureNames.length, 8);
-  const heatmapFeatureNames = normalizedHeatmap.featureNames.slice(0, displayLimit);
-  const heatmapMatrix = normalizedHeatmap.matrix.slice(0, displayLimit).map((row) => row.slice(0, displayLimit));
+  const heatmapFeatureNames = normalizedHeatmap.featureNames.slice(
+    0,
+    displayLimit,
+  );
+  const heatmapMatrix = normalizedHeatmap.matrix
+    .slice(0, displayLimit)
+    .map((row) => row.slice(0, displayLimit));
   const maxAbsValue = heatmapMatrix.reduce((maxValue, row) => {
-    const rowMax = row.reduce((innerMax, value) => Math.max(innerMax, Math.abs(value)), 0);
+    const rowMax = row.reduce(
+      (innerMax, value) => Math.max(innerMax, Math.abs(value)),
+      0,
+    );
     return Math.max(maxValue, rowMax);
   }, 0);
   const strongestPairs = safeArray(normalizedHeatmap.topPairs).slice(0, 4);
-  const strongestFeatures = safeArray(normalizedHeatmap.topFeatures).slice(0, 4);
+  const strongestFeatures = safeArray(normalizedHeatmap.topFeatures).slice(
+    0,
+    4,
+  );
   const defaultSelection =
     strongestPairs[0] ||
     (heatmapFeatureNames.length
@@ -1868,14 +2403,21 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
           feature_i: heatmapFeatureNames[0],
           feature_j: heatmapFeatureNames[0],
           interaction_value: Number(heatmapMatrix[0]?.[0] ?? 0),
-          absolute_interaction_value: Math.abs(Number(heatmapMatrix[0]?.[0] ?? 0)),
+          absolute_interaction_value: Math.abs(
+            Number(heatmapMatrix[0]?.[0] ?? 0),
+          ),
         }
       : null);
   const [selectedPair, setSelectedPair] = React.useState(defaultSelection);
 
   React.useEffect(() => {
     setSelectedPair(defaultSelection);
-  }, [defaultSelection?.feature_i, defaultSelection?.feature_j, defaultSelection?.interaction_value, heatmapFeatureNames.length]);
+  }, [
+    defaultSelection?.feature_i,
+    defaultSelection?.feature_j,
+    defaultSelection?.interaction_value,
+    heatmapFeatureNames.length,
+  ]);
 
   const selectedValue = Number(selectedPair?.interaction_value ?? 0);
   const selectedAbsoluteValue = Math.abs(selectedValue);
@@ -1909,32 +2451,47 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
         <div>
           <strong>SHAP interaction heatmap</strong>
           <p>
-            Cell strength shows how two features work together to move the anomaly score. The chart uses a TreeSHAP
-            interaction matrix when the backend can compute it.
+            Cell strength shows how two features work together to move the
+            anomaly score. The chart uses a TreeSHAP interaction matrix when the
+            backend can compute it.
           </p>
         </div>
-        <span>{loading ? "Loading..." : `${heatmapFeatureNames.length} features`}</span>
+        <span>
+          {loading ? "Loading..." : `${heatmapFeatureNames.length} features`}
+        </span>
       </div>
       <div className="shap-heatmap__layout">
         <div
           className="shap-heatmap__matrix"
           aria-label="SHAP interaction heatmap"
-          style={{ gridTemplateColumns: `minmax(110px, 1.1fr) repeat(${heatmapFeatureNames.length}, minmax(34px, 1fr))` }}
+          style={{
+            gridTemplateColumns: `minmax(110px, 1.1fr) repeat(${heatmapFeatureNames.length}, minmax(34px, 1fr))`,
+          }}
         >
           <div className="shap-heatmap__corner">Features</div>
           {heatmapFeatureNames.map((name) => (
-            <div key={`col-${name}`} className="shap-heatmap__label shap-heatmap__label--col">
+            <div
+              key={`col-${name}`}
+              className="shap-heatmap__label shap-heatmap__label--col"
+            >
               {name}
             </div>
           ))}
           {heatmapFeatureNames.map((rowName, rowIndex) => (
             <React.Fragment key={`row-${rowName}`}>
-              <div className="shap-heatmap__label shap-heatmap__label--row">{rowName}</div>
+              <div className="shap-heatmap__label shap-heatmap__label--row">
+                {rowName}
+              </div>
               {heatmapFeatureNames.map((colName, colIndex) => {
                 const value = Number(heatmapMatrix[rowIndex]?.[colIndex] ?? 0);
-                const intensity = maxAbsValue > 0 ? Math.min(1, Math.abs(value) / maxAbsValue) : 0;
+                const intensity =
+                  maxAbsValue > 0
+                    ? Math.min(1, Math.abs(value) / maxAbsValue)
+                    : 0;
                 const tone = value >= 0 ? "positive" : "negative";
-                const isSelected = selectedPair?.feature_i === rowName && selectedPair?.feature_j === colName;
+                const isSelected =
+                  selectedPair?.feature_i === rowName &&
+                  selectedPair?.feature_j === colName;
                 return (
                   <button
                     onClick={() =>
@@ -1956,7 +2513,9 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
                     }}
                     title={`${rowName} × ${colName}: ${value.toFixed(4)}`}
                   >
-                    <span>{Math.abs(value) < 0.001 ? "0.00" : value.toFixed(2)}</span>
+                    <span>
+                      {Math.abs(value) < 0.001 ? "0.00" : value.toFixed(2)}
+                    </span>
                   </button>
                 );
               })}
@@ -1986,10 +2545,14 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
                   <span>Strength</span>
                   <strong>{selectedAbsoluteValue.toFixed(3)}</strong>
                 </div>
-                <p className="shap-heatmap__detail-copy">{selectedInterpretation}</p>
+                <p className="shap-heatmap__detail-copy">
+                  {selectedInterpretation}
+                </p>
               </>
             ) : (
-              <p className="shap-heatmap__detail-copy">Select a cell to inspect the pair-level explanation.</p>
+              <p className="shap-heatmap__detail-copy">
+                Select a cell to inspect the pair-level explanation.
+              </p>
             )}
           </div>
           <div className="shap-heatmap__pairs">
@@ -2006,7 +2569,8 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
                       feature_j: pair.feature_j,
                       interaction_value: Number(pair.interaction_value ?? 0),
                       absolute_interaction_value: Number(
-                        pair.absolute_interaction_value ?? Math.abs(Number(pair.interaction_value ?? 0)),
+                        pair.absolute_interaction_value ??
+                          Math.abs(Number(pair.interaction_value ?? 0)),
                       ),
                     })
                   }
@@ -2018,7 +2582,9 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
                 </button>
               ))
             ) : (
-              <div className="shap-heatmap__empty">No pair ranking available yet.</div>
+              <div className="shap-heatmap__empty">
+                No pair ranking available yet.
+              </div>
             )}
           </div>
           <div className="shap-heatmap__pairs">
@@ -2027,11 +2593,15 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
               strongestFeatures.map((item) => (
                 <div key={item.feature} className="shap-heatmap__pair">
                   <span>{item.feature}</span>
-                  <strong>{Number(item.interaction_strength ?? 0).toFixed(3)}</strong>
+                  <strong>
+                    {Number(item.interaction_strength ?? 0).toFixed(3)}
+                  </strong>
                 </div>
               ))
             ) : (
-              <div className="shap-heatmap__empty">No feature ranking available yet.</div>
+              <div className="shap-heatmap__empty">
+                No feature ranking available yet.
+              </div>
             )}
           </div>
         </div>
@@ -2041,20 +2611,29 @@ function RechartsShapCard({ features, interactionHeatmap, loading, onSelectPair 
 }
 
 function LatentManifoldCard({ manifold, loading }) {
-  const normalized = React.useMemo(() => normalizeLatentManifold(manifold), [manifold]);
+  const normalized = React.useMemo(
+    () => normalizeLatentManifold(manifold),
+    [manifold],
+  );
   if (!normalized) {
     return (
       <div className="viz-card viz-card--strip manifold-card">
         <div className="viz-card__head">
           <div>
             <strong>Latent manifold</strong>
-            <p>Run the anomaly test to project VAE latents and overlay the Deep SVDD boundary.</p>
+            <p>
+              Run the anomaly test to project VAE latents and overlay the Deep
+              SVDD boundary.
+            </p>
           </div>
           <span>{loading ? "Loading..." : "No manifold yet"}</span>
         </div>
         <div className="manifold-empty">
           <strong>No latent geometry available</strong>
-          <p>The backend has not returned a latent manifold for the current record yet.</p>
+          <p>
+            The backend has not returned a latent manifold for the current
+            record yet.
+          </p>
         </div>
       </div>
     );
@@ -2062,7 +2641,10 @@ function LatentManifoldCard({ manifold, loading }) {
 
   const xs = normalized.points.map((point) => point.x);
   const ys = normalized.points.map((point) => point.y);
-  const boundaryCenter = normalized.deepSvdd.boundaryCenter.length >= 2 ? normalized.deepSvdd.boundaryCenter : null;
+  const boundaryCenter =
+    normalized.deepSvdd.boundaryCenter.length >= 2
+      ? normalized.deepSvdd.boundaryCenter
+      : null;
   if (boundaryCenter) {
     xs.push(boundaryCenter[0]);
     ys.push(boundaryCenter[1]);
@@ -2077,29 +2659,53 @@ function LatentManifoldCard({ manifold, loading }) {
   const pad = 8;
   const viewBoxWidth = 100;
   const viewBoxHeight = 100;
-  const xScale = (value) => pad + ((value - minX) / xSpan) * (viewBoxWidth - pad * 2);
-  const yScale = (value) => viewBoxHeight - pad - ((value - minY) / ySpan) * (viewBoxHeight - pad * 2);
+  const xScale = (value) =>
+    pad + ((value - minX) / xSpan) * (viewBoxWidth - pad * 2);
+  const yScale = (value) =>
+    viewBoxHeight - pad - ((value - minY) / ySpan) * (viewBoxHeight - pad * 2);
   const boundaryCx = boundaryCenter ? xScale(boundaryCenter[0]) : 50;
   const boundaryCy = boundaryCenter ? yScale(boundaryCenter[1]) : 50;
-  const boundaryRx = boundaryCenter ? Math.max(4, (normalized.deepSvdd.boundaryRadius / xSpan) * (viewBoxWidth - pad * 2)) : 0;
-  const boundaryRy = boundaryCenter ? Math.max(4, (normalized.deepSvdd.boundaryRadius / ySpan) * (viewBoxHeight - pad * 2)) : 0;
-  const currentPoint = normalized.currentPoint || normalized.points[normalized.points.length - 1];
+  const boundaryRx = boundaryCenter
+    ? Math.max(
+        4,
+        (normalized.deepSvdd.boundaryRadius / xSpan) * (viewBoxWidth - pad * 2),
+      )
+    : 0;
+  const boundaryRy = boundaryCenter
+    ? Math.max(
+        4,
+        (normalized.deepSvdd.boundaryRadius / ySpan) *
+          (viewBoxHeight - pad * 2),
+      )
+    : 0;
+  const currentPoint =
+    normalized.currentPoint || normalized.points[normalized.points.length - 1];
   const currentPointInside =
-    Number.isFinite(normalized.deepSvdd.radius) && Number.isFinite(currentPoint?.deepSvddDistance)
+    Number.isFinite(normalized.deepSvdd.radius) &&
+    Number.isFinite(currentPoint?.deepSvddDistance)
       ? currentPoint.deepSvddDistance <= normalized.deepSvdd.radius
       : null;
   const currentPointLabel = currentPoint?.label || "Current record";
-  const currentLabelX = currentPoint ? Math.min(94, Math.max(10, xScale(currentPoint.x) + 1.4)) : 0;
-  const currentLabelY = currentPoint ? Math.min(92, Math.max(8, yScale(currentPoint.y) - 1.6)) : 0;
+  const currentLabelX = currentPoint
+    ? Math.min(94, Math.max(10, xScale(currentPoint.x) + 1.4))
+    : 0;
+  const currentLabelY = currentPoint
+    ? Math.min(92, Math.max(8, yScale(currentPoint.y) - 1.6))
+    : 0;
 
   return (
     <div className="viz-card viz-card--strip viz-card--compact manifold-card">
       <div className="viz-card__head">
         <div>
           <strong>Latent manifold</strong>
-          <p>VAE latents are projected to 2D. Similar records cluster, and the current record stays highlighted.</p>
+          <p>
+            VAE latents are projected to 2D. Similar records cluster, and the
+            current record stays highlighted.
+          </p>
         </div>
-        <span>{loading ? "Loading..." : `${normalized.pointCount} records`}</span>
+        <span>
+          {loading ? "Loading..." : `${normalized.pointCount} records`}
+        </span>
       </div>
       <div className="manifold-legend">
         <span>Color = anomaly score</span>
@@ -2107,10 +2713,20 @@ function LatentManifoldCard({ manifold, loading }) {
         <span>Star = current test record</span>
       </div>
       <div className="manifold-shell">
-        <svg className="manifold-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Latent manifold scatter plot">
+        <svg
+          className="manifold-svg"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label="Latent manifold scatter plot"
+        >
           <line x1="8" y1="92" x2="92" y2="92" className="manifold-axis" />
           <line x1="8" y1="92" x2="8" y2="8" className="manifold-axis" />
-          {boundaryCenter && Number.isFinite(boundaryRx) && Number.isFinite(boundaryRy) && boundaryRx > 0 && boundaryRy > 0 ? (
+          {boundaryCenter &&
+          Number.isFinite(boundaryRx) &&
+          Number.isFinite(boundaryRy) &&
+          boundaryRx > 0 &&
+          boundaryRy > 0 ? (
             <ellipse
               cx={boundaryCx}
               cy={boundaryCy}
@@ -2125,13 +2741,27 @@ function LatentManifoldCard({ manifold, loading }) {
             const score = clamp01(point.anomalyScore);
             const size = point.isCurrent ? 2.3 : 1.35 + score * 0.95;
             const fill = scoreToColor(score);
-            const stroke = point.isCurrent ? "#ffffff" : "rgba(7, 17, 29, 0.65)";
+            const stroke = point.isCurrent
+              ? "#ffffff"
+              : "rgba(7, 17, 29, 0.65)";
             const strokeWidth = point.isCurrent ? 0.7 : 0.38;
             return (
               <g key={`${point.role}-${point.index}`}>
-                <circle cx={x} cy={y} r={size} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={size}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                />
                 {point.isCurrent ? (
-                  <circle cx={x} cy={y} r={size + 1.2} className="manifold-current-ring" />
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={size + 1.2}
+                    className="manifold-current-ring"
+                  />
                 ) : null}
                 <title>
                   {`${point.label}: score ${score.toFixed(3)}, Deep SVDD distance ${Number.isFinite(point.deepSvddDistance) ? point.deepSvddDistance.toFixed(3) : "n/a"}`}
@@ -2141,7 +2771,11 @@ function LatentManifoldCard({ manifold, loading }) {
           })}
           {currentPoint ? (
             <g>
-              <text x={currentLabelX} y={currentLabelY} className="manifold-current-label">
+              <text
+                x={currentLabelX}
+                y={currentLabelY}
+                className="manifold-current-label"
+              >
                 Current
               </text>
             </g>
@@ -2159,26 +2793,45 @@ function LatentManifoldCard({ manifold, loading }) {
         </div>
         <div className="manifold-meta__item">
           <span>Deep SVDD radius</span>
-          <strong>{Number.isFinite(normalized.deepSvdd.radius) ? normalized.deepSvdd.radius.toFixed(3) : "N/A"}</strong>
+          <strong>
+            {Number.isFinite(normalized.deepSvdd.radius)
+              ? normalized.deepSvdd.radius.toFixed(3)
+              : "N/A"}
+          </strong>
         </div>
       </div>
       <div className="manifold-meta manifold-meta--status">
         <div className="manifold-meta__item">
           <span>Boundary status</span>
-          <strong>{currentPointInside === null ? "N/A" : currentPointInside ? "Inside boundary" : "Outside boundary"}</strong>
+          <strong>
+            {currentPointInside === null
+              ? "N/A"
+              : currentPointInside
+                ? "Inside boundary"
+                : "Outside boundary"}
+          </strong>
         </div>
         <div className="manifold-meta__item">
           <span>Current distance</span>
-          <strong>{Number.isFinite(normalized.deepSvdd.currentDistanceFromBoundary) ? normalized.deepSvdd.currentDistanceFromBoundary.toFixed(3) : "N/A"}</strong>
+          <strong>
+            {Number.isFinite(normalized.deepSvdd.currentDistanceFromBoundary)
+              ? normalized.deepSvdd.currentDistanceFromBoundary.toFixed(3)
+              : "N/A"}
+          </strong>
         </div>
       </div>
-      <p className="manifold-note">Deep SVDD boundary is shown as an approximate 2D ring.</p>
+      <p className="manifold-note">
+        Deep SVDD boundary is shown as an approximate 2D ring.
+      </p>
     </div>
   );
 }
 
 function ResidualHeatmapCard({ heatmap, loading }) {
-  const normalized = React.useMemo(() => normalizeReconstructionResidualHeatmap(heatmap), [heatmap]);
+  const normalized = React.useMemo(
+    () => normalizeReconstructionResidualHeatmap(heatmap),
+    [heatmap],
+  );
   const [selectedCell, setSelectedCell] = React.useState(null);
 
   React.useEffect(() => {
@@ -2201,19 +2854,28 @@ function ResidualHeatmapCard({ heatmap, loading }) {
         </div>
         <div className="manifold-empty">
           <strong>No residual heatmap available</strong>
-          <p>The backend has not returned a reconstruction residual matrix for the current record yet.</p>
+          <p>
+            The backend has not returned a reconstruction residual matrix for
+            the current record yet.
+          </p>
         </div>
       </div>
     );
   }
 
   const activeCell = selectedCell || normalized.selectedCell;
-  const selectedRow = normalized.models[activeCell?.rowIndex ?? 0] || normalized.models[0];
+  const selectedRow =
+    normalized.models[activeCell?.rowIndex ?? 0] || normalized.models[0];
   const selectedFeature =
-    normalized.featureNames[activeCell?.featureIndex ?? 0] || normalized.highlightFeature || normalized.featureNames[0];
+    normalized.featureNames[activeCell?.featureIndex ?? 0] ||
+    normalized.highlightFeature ||
+    normalized.featureNames[0];
   const selectedValue =
-    activeCell && selectedRow ? Number(selectedRow.row[activeCell.featureIndex] ?? 0) : Number(selectedRow?.row?.[0] ?? 0);
-  const peakValue = normalized.maxAbsResidual || Math.max(...normalized.matrix.flat(), 0);
+    activeCell && selectedRow
+      ? Number(selectedRow.row[activeCell.featureIndex] ?? 0)
+      : Number(selectedRow?.row?.[0] ?? 0);
+  const peakValue =
+    normalized.maxAbsResidual || Math.max(...normalized.matrix.flat(), 0);
   const matrixStyle = React.useMemo(
     () => ({
       "--residual-heatmap-columns": `minmax(118px, 1.1fr) repeat(${normalized.featureNames.length}, minmax(36px, 1fr))`,
@@ -2227,9 +2889,16 @@ function ResidualHeatmapCard({ heatmap, loading }) {
       <div className="viz-card__head">
         <div>
           <strong>Per-feature reconstruction errors</strong>
-          <p>Rows show reconstruction models. Brighter cells mark larger feature misses across the full feature vector.</p>
+          <p>
+            Rows show reconstruction models. Brighter cells mark larger feature
+            misses across the full feature vector.
+          </p>
         </div>
-        <span>{loading ? "Loading..." : `${normalized.models.length} models x ${normalized.featureNames.length} features`}</span>
+        <span>
+          {loading
+            ? "Loading..."
+            : `${normalized.models.length} models x ${normalized.featureNames.length} features`}
+        </span>
       </div>
       <div className="residual-heatmap__layout">
         <div
@@ -2254,15 +2923,23 @@ function ResidualHeatmapCard({ heatmap, loading }) {
                 <span>{modelRow.meanAbsResidual.toFixed(3)}</span>
               </div>
               {modelRow.row.map((value, featureIndex) => {
-                const isSelected = activeCell?.rowIndex === rowIndex && activeCell?.featureIndex === featureIndex;
-                const isHighlighted = normalized.highlightFeature === normalized.featureNames[featureIndex];
+                const isSelected =
+                  activeCell?.rowIndex === rowIndex &&
+                  activeCell?.featureIndex === featureIndex;
+                const isHighlighted =
+                  normalized.highlightFeature ===
+                  normalized.featureNames[featureIndex];
                 return (
                   <button
                     key={`${modelRow.modelKey}-${featureIndex}`}
                     type="button"
                     className={`residual-heatmap__cell${isSelected ? " residual-heatmap__cell--selected" : ""}${isHighlighted ? " residual-heatmap__cell--highlight" : ""}`}
-                    style={{ backgroundColor: residualMagnitudeColor(value, peakValue) }}
-                    onClick={() => setSelectedCell({ rowIndex, featureIndex, value })}
+                    style={{
+                      backgroundColor: residualMagnitudeColor(value, peakValue),
+                    }}
+                    onClick={() =>
+                      setSelectedCell({ rowIndex, featureIndex, value })
+                    }
                     title={`${modelRow.model}: ${normalized.featureNames[featureIndex]} residual ${Number(value).toFixed(4)}`}
                   >
                     <span>{Number(value).toFixed(3)}</span>
@@ -2272,11 +2949,15 @@ function ResidualHeatmapCard({ heatmap, loading }) {
             </React.Fragment>
           ))}
         </div>
-          <div className="residual-heatmap__summary">
+        <div className="residual-heatmap__summary">
           <div className="residual-heatmap__legend">
             <strong>How to read</strong>
-            <span>Brighter cells mean a larger absolute reconstruction error.</span>
-            <span>Highlighted feature: {normalized.highlightFeature || "None"}</span>
+            <span>
+              Brighter cells mean a larger absolute reconstruction error.
+            </span>
+            <span>
+              Highlighted feature: {normalized.highlightFeature || "None"}
+            </span>
             <span>Current record: {normalized.currentRecordLabel}</span>
           </div>
           <div className="residual-heatmap__detail">
@@ -2291,14 +2972,21 @@ function ResidualHeatmapCard({ heatmap, loading }) {
             </div>
             <div className="residual-heatmap__detail-row">
               <span>Residual</span>
-              <strong>{Number.isFinite(selectedValue) ? selectedValue.toFixed(4) : "N/A"}</strong>
+              <strong>
+                {Number.isFinite(selectedValue)
+                  ? selectedValue.toFixed(4)
+                  : "N/A"}
+              </strong>
             </div>
             <div className="residual-heatmap__detail-row">
               <span>Max cell</span>
-              <strong>{Number.isFinite(peakValue) ? peakValue.toFixed(4) : "N/A"}</strong>
+              <strong>
+                {Number.isFinite(peakValue) ? peakValue.toFixed(4) : "N/A"}
+              </strong>
             </div>
             <p className="residual-heatmap__detail-copy">
-              This view exposes feature-level reconstruction misses that are usually flattened into a single anomaly score.
+              This view exposes feature-level reconstruction misses that are
+              usually flattened into a single anomaly score.
             </p>
           </div>
           <div className="residual-heatmap__pairs">
@@ -2318,7 +3006,9 @@ function ResidualHeatmapCard({ heatmap, loading }) {
 
 function normalizeComparisonModels(models) {
   return safeArray(models).map((model, index) => {
-    const score = clamp01(Number(model.score ?? model.f1 ?? model.accuracy ?? 0));
+    const score = clamp01(
+      Number(model.score ?? model.f1 ?? model.accuracy ?? 0),
+    );
     return {
       ...model,
       score,
@@ -2329,16 +3019,23 @@ function normalizeComparisonModels(models) {
 }
 
 function getBestComparisonModel(models) {
-  return [...normalizeComparisonModels(models)].sort((a, b) => b.score - a.score)[0] || null;
+  return (
+    [...normalizeComparisonModels(models)].sort(
+      (a, b) => b.score - a.score,
+    )[0] || null
+  );
 }
 
 function ComparisonRiskMap({ models }) {
-  const sortedModels = normalizeComparisonModels(models).sort((a, b) => b.score - a.score);
+  const sortedModels = normalizeComparisonModels(models).sort(
+    (a, b) => b.score - a.score,
+  );
   const bandOrder = ["Low", "Medium", "High"];
   const groupedBands = bandOrder.map((band) => {
     const bandModels = sortedModels.filter((model) => model.band === band);
     const averageScore = bandModels.length
-      ? bandModels.reduce((sum, model) => sum + model.score, 0) / bandModels.length
+      ? bandModels.reduce((sum, model) => sum + model.score, 0) /
+        bandModels.length
       : 0;
     return {
       band,
@@ -2352,46 +3049,76 @@ function ComparisonRiskMap({ models }) {
       <div className="viz-card__head">
         <div>
           <strong>Risk map</strong>
-          <p>Model-by-model anomaly spread grouped into Low, Medium, and High risk bands.</p>
+          <p>
+            Model-by-model anomaly spread grouped into Low, Medium, and High
+            risk bands.
+          </p>
         </div>
         <span>{sortedModels.length} models</span>
       </div>
       <div className="risk-map-legend">
         {groupedBands.map((band) => (
-          <div key={band.band} className={`risk-map-legend__item risk-map-legend__item--${band.band.toLowerCase()}`}>
+          <div
+            key={band.band}
+            className={`risk-map-legend__item risk-map-legend__item--${band.band.toLowerCase()}`}
+          >
             <strong>{band.band}</strong>
-            <span>{band.models.length} model{band.models.length === 1 ? "" : "s"}</span>
-            <small>{band.models.length ? `${Math.round(band.averageScore * 100)}% average score` : "No models in this band"}</small>
+            <span>
+              {band.models.length} model{band.models.length === 1 ? "" : "s"}
+            </span>
+            <small>
+              {band.models.length
+                ? `${Math.round(band.averageScore * 100)}% average score`
+                : "No models in this band"}
+            </small>
           </div>
         ))}
       </div>
       <div className="risk-map-bands">
         {groupedBands.map((band) => (
-          <section key={band.band} className={`risk-map-band risk-map-band--${band.band.toLowerCase()}`}>
+          <section
+            key={band.band}
+            className={`risk-map-band risk-map-band--${band.band.toLowerCase()}`}
+          >
             <div className="risk-map-band__head">
               <div>
                 <strong>{band.band} Risk</strong>
-                <p>{band.models.length ? `${band.models.length} models in this band` : "No models currently assigned"}</p>
+                <p>
+                  {band.models.length
+                    ? `${band.models.length} models in this band`
+                    : "No models currently assigned"}
+                </p>
               </div>
-              <span>{band.models.length ? `${Math.round(band.averageScore * 100)}% avg` : "0%"}</span>
+              <span>
+                {band.models.length
+                  ? `${Math.round(band.averageScore * 100)}% avg`
+                  : "0%"}
+              </span>
             </div>
             <div className="risk-map-band__tiles">
               {band.models.length ? (
                 band.models.map((model) => (
-                  <div key={model.key} className={`risk-map-tile risk-map-tile--${band.band.toLowerCase()}`}>
+                  <div
+                    key={model.key}
+                    className={`risk-map-tile risk-map-tile--${band.band.toLowerCase()}`}
+                  >
                     <div className="risk-map-tile__top">
                       <strong>{model.name}</strong>
                       <span>{Math.round(model.score * 100)}%</span>
                     </div>
                     <div className="risk-map-tile__score">{model.band}</div>
                     <div className="risk-map-tile__meta">
-                      <span>F1 {Math.round((model.f1 ?? model.score) * 100)}%</span>
+                      <span>
+                        F1 {Math.round((model.f1 ?? model.score) * 100)}%
+                      </span>
                       <span>{model.alert || "Stable"}</span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="risk-map-empty">No models landed in this band.</div>
+                <div className="risk-map-empty">
+                  No models landed in this band.
+                </div>
               )}
             </div>
           </section>
@@ -2402,10 +3129,13 @@ function ComparisonRiskMap({ models }) {
 }
 
 function ModelComparisonChart({ models }) {
-  const chartData = normalizeComparisonModels(models).sort((a, b) => b.score - a.score);
+  const chartData = normalizeComparisonModels(models).sort(
+    (a, b) => b.score - a.score,
+  );
   const leader = chartData[0] || null;
   const trailer = chartData[chartData.length - 1] || null;
-  const scoreSpread = leader && trailer ? Math.max(0, leader.score - trailer.score) : 0;
+  const scoreSpread =
+    leader && trailer ? Math.max(0, leader.score - trailer.score) : 0;
   const averageScore = chartData.length
     ? chartData.reduce((sum, model) => sum + model.score, 0) / chartData.length
     : 0;
@@ -2416,7 +3146,10 @@ function ModelComparisonChart({ models }) {
       <div className="viz-card__head">
         <div>
           <strong>Model metric comparison</strong>
-          <p>Each bar set shows how quality changes across models, with the strongest detector pinned to the top.</p>
+          <p>
+            Each bar set shows how quality changes across models, with the
+            strongest detector pinned to the top.
+          </p>
         </div>
         <span>{chartData.length} models</span>
       </div>
@@ -2424,7 +3157,11 @@ function ModelComparisonChart({ models }) {
         <div className="comparison-highlight">
           <span>Leader</span>
           <strong>{leader?.name || "Locked"}</strong>
-          <small>{leader ? `${Math.round(leader.score * 100)}% comparative score` : "Run the analysis to populate the ranking."}</small>
+          <small>
+            {leader
+              ? `${Math.round(leader.score * 100)}% comparative score`
+              : "Run the analysis to populate the ranking."}
+          </small>
         </div>
         <div className="comparison-highlight">
           <span>Score spread</span>
@@ -2444,8 +3181,14 @@ function ModelComparisonChart({ models }) {
       </div>
       <div className="recharts-box">
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} margin={{ top: 10, right: 18, bottom: 24, left: 0 }}>
-            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
+          <BarChart
+            data={chartData}
+            margin={{ top: 10, right: 18, bottom: 24, left: 0 }}
+          >
+            <CartesianGrid
+              stroke="rgba(185, 201, 225, 0.12)"
+              strokeDasharray="4 4"
+            />
             <XAxis
               dataKey="name"
               stroke="#9fb2ca"
@@ -2456,9 +3199,17 @@ function ModelComparisonChart({ models }) {
               textAnchor="end"
               height={64}
             />
-            <YAxis stroke="#9fb2ca" tickLine={false} axisLine={false} domain={[0, 1]} />
+            <YAxis
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+              domain={[0, 1]}
+            />
             <Tooltip
-              formatter={(value, name) => [`${Math.round(Number(value) * 100)}%`, name]}
+              formatter={(value, name) => [
+                `${Math.round(Number(value) * 100)}%`,
+                name,
+              ]}
               contentStyle={{
                 background: "rgba(10, 17, 29, 0.96)",
                 border: "1px solid rgba(185, 201, 225, 0.18)",
@@ -2467,22 +3218,53 @@ function ModelComparisonChart({ models }) {
               }}
             />
             <Legend />
-            <Bar dataKey="score" name="Comparative score" fill="#9cf1d2" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="precision" name="Precision" fill="#72d7ff" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="recall" name="Recall" fill="#f4a261" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="accuracy" name="Accuracy" fill="#ff7f96" radius={[8, 8, 0, 0]} />
+            <Bar
+              dataKey="score"
+              name="Comparative score"
+              fill="#9cf1d2"
+              radius={[8, 8, 0, 0]}
+            />
+            <Bar
+              dataKey="precision"
+              name="Precision"
+              fill="#72d7ff"
+              radius={[8, 8, 0, 0]}
+            />
+            <Bar
+              dataKey="recall"
+              name="Recall"
+              fill="#f4a261"
+              radius={[8, 8, 0, 0]}
+            />
+            <Bar
+              dataKey="accuracy"
+              name="Accuracy"
+              fill="#ff7f96"
+              radius={[8, 8, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
       <div className="comparison-matrix-note">
         <strong>How to read it:</strong>
-        <span>The green bar is the combined score. Blue, orange, and pink show precision, recall, and accuracy so you can spot the balance, not just the winner.</span>
+        <span>
+          The green bar is the combined score. Blue, orange, and pink show
+          precision, recall, and accuracy so you can spot the balance, not just
+          the winner.
+        </span>
       </div>
     </div>
   );
 }
 
-function ScoreStreamDriftChart({ stream, fallbackSeries, driftIndex, loading, driftActive, driftMethod }) {
+function ScoreStreamDriftChart({
+  stream,
+  fallbackSeries,
+  driftIndex,
+  loading,
+  driftActive,
+  driftMethod,
+}) {
   const sourceSeries = stream.length
     ? stream.map((value, index) => ({
         label: `S${index + 1}`,
@@ -2495,12 +3277,25 @@ function ScoreStreamDriftChart({ stream, fallbackSeries, driftIndex, loading, dr
         }))
       : [];
 
-  const changeIndex = Number.isInteger(driftIndex) && driftIndex >= 0 && driftIndex < sourceSeries.length ? driftIndex : null;
-  const changeLabel = changeIndex !== null ? sourceSeries[changeIndex]?.label || null : null;
-  const sourceLabel = stream.length ? "Stream" : fallbackSeries.length ? "Fallback" : "No stream";
+  const changeIndex =
+    Number.isInteger(driftIndex) &&
+    driftIndex >= 0 &&
+    driftIndex < sourceSeries.length
+      ? driftIndex
+      : null;
+  const changeLabel =
+    changeIndex !== null ? sourceSeries[changeIndex]?.label || null : null;
+  const sourceLabel = stream.length
+    ? "Stream"
+    : fallbackSeries.length
+      ? "Fallback"
+      : "No stream";
   const latestScore = sourceSeries[sourceSeries.length - 1]?.score ?? 0;
-  const changeScore = changeIndex !== null ? sourceSeries[changeIndex]?.score ?? null : null;
-  const driftBadgeLabel = driftActive ? String(driftMethod || "Drift").toUpperCase() : null;
+  const changeScore =
+    changeIndex !== null ? (sourceSeries[changeIndex]?.score ?? null) : null;
+  const driftBadgeLabel = driftActive
+    ? String(driftMethod || "Drift").toUpperCase()
+    : null;
 
   return (
     <div className="viz-card viz-card--recharts viz-card--compact">
@@ -2515,16 +3310,32 @@ function ScoreStreamDriftChart({ stream, fallbackSeries, driftIndex, loading, dr
       </div>
       <div className="recharts-box">
         <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={sourceSeries} margin={{ top: 8, right: 14, bottom: 4, left: 0 }}>
+          <LineChart
+            data={sourceSeries}
+            margin={{ top: 8, right: 14, bottom: 4, left: 0 }}
+          >
             <defs>
               <linearGradient id="driftStreamFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#72d7ff" stopOpacity={0.32} />
                 <stop offset="95%" stopColor="#72d7ff" stopOpacity={0.04} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
-            <XAxis dataKey="label" stroke="#9fb2ca" tickLine={false} axisLine={false} />
-            <YAxis stroke="#9fb2ca" tickLine={false} axisLine={false} domain={[0, 1]} />
+            <CartesianGrid
+              stroke="rgba(185, 201, 225, 0.12)"
+              strokeDasharray="4 4"
+            />
+            <XAxis
+              dataKey="label"
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+              domain={[0, 1]}
+            />
             <Tooltip
               formatter={(value) => [Number(value).toFixed(4), "Score"]}
               labelFormatter={(label) => `Visit ${label}`}
@@ -2561,18 +3372,38 @@ function ScoreStreamDriftChart({ stream, fallbackSeries, driftIndex, loading, dr
       </div>
       <div className="viz-foot">
         <span>Now: {latestScore.toFixed(4)}</span>
-        <span>{changeIndex === null ? "No drift" : `Shift at ${changeLabel}${changeScore !== null ? ` (${changeScore.toFixed(4)})` : ""}`}</span>
-        {driftBadgeLabel ? <span className="drift-badge drift-badge--alert">{driftBadgeLabel}</span> : null}
+        <span>
+          {changeIndex === null
+            ? "No drift"
+            : `Shift at ${changeLabel}${changeScore !== null ? ` (${changeScore.toFixed(4)})` : ""}`}
+        </span>
+        {driftBadgeLabel ? (
+          <span className="drift-badge drift-badge--alert">
+            {driftBadgeLabel}
+          </span>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function ModelComparisonTable({ models }) {
-  const rows = normalizeComparisonModels(models).sort((a, b) => b.score - a.score);
+  const rows = normalizeComparisonModels(models).sort(
+    (a, b) => b.score - a.score,
+  );
   const bestKey = rows[0]?.key;
-  const fastest = [...rows].sort((a, b) => (a.latencyMs ?? Number.POSITIVE_INFINITY) - (b.latencyMs ?? Number.POSITIVE_INFINITY))[0] || null;
-  const lightest = [...rows].sort((a, b) => (a.memoryMb ?? Number.POSITIVE_INFINITY) - (b.memoryMb ?? Number.POSITIVE_INFINITY))[0] || null;
+  const fastest =
+    [...rows].sort(
+      (a, b) =>
+        (a.latencyMs ?? Number.POSITIVE_INFINITY) -
+        (b.latencyMs ?? Number.POSITIVE_INFINITY),
+    )[0] || null;
+  const lightest =
+    [...rows].sort(
+      (a, b) =>
+        (a.memoryMb ?? Number.POSITIVE_INFINITY) -
+        (b.memoryMb ?? Number.POSITIVE_INFINITY),
+    )[0] || null;
   const bestTradeoff = rows[0] || null;
 
   return (
@@ -2580,7 +3411,10 @@ function ModelComparisonTable({ models }) {
       <div className="viz-card__head">
         <div>
           <strong>Model comparison table</strong>
-          <p>Sorted performance view with leader highlights, cost signals, and family badges for quick reading.</p>
+          <p>
+            Sorted performance view with leader highlights, cost signals, and
+            family badges for quick reading.
+          </p>
         </div>
         <span>{rows.length} models</span>
       </div>
@@ -2616,17 +3450,25 @@ function ModelComparisonTable({ models }) {
           </thead>
           <tbody>
             {rows.map((model, index) => (
-              <tr key={model.key} className={model.key === bestKey ? "is-best" : ""}>
+              <tr
+                key={model.key}
+                className={model.key === bestKey ? "is-best" : ""}
+              >
                 <td>{index + 1}</td>
                 <td>
                   <strong>{model.name}</strong>
                   <span>{model.variantLabel}</span>
                 </td>
                 <td>
-                  <ModelFamilyBadge family={model.family} label={model.familyLabel} />
+                  <ModelFamilyBadge
+                    family={model.family}
+                    label={model.familyLabel}
+                  />
                 </td>
                 <td>{Math.round((model.score ?? 0) * 100)}%</td>
-                <td>{Math.round((model.precision ?? model.score ?? 0) * 100)}%</td>
+                <td>
+                  {Math.round((model.precision ?? model.score ?? 0) * 100)}%
+                </td>
                 <td>{Math.round((model.recall ?? model.score ?? 0) * 100)}%</td>
                 <td>{Math.round((model.f1 ?? model.score ?? 0) * 100)}%</td>
                 <td>{model.latencyMs ?? "N/A"} ms</td>
@@ -2638,7 +3480,8 @@ function ModelComparisonTable({ models }) {
         </table>
       </div>
       <div className="comparison-table-footnote">
-        The top row is the current leader, while the latency and memory columns show how expensive each model is to keep online.
+        The top row is the current leader, while the latency and memory columns
+        show how expensive each model is to keep online.
       </div>
     </section>
   );
@@ -2657,16 +3500,39 @@ function ScoreHistogramCard({ history, currentScore, loading }) {
       <div className="viz-card__head">
         <div>
           <strong>Score histogram</strong>
-          <p>Histogram of the latest anomaly score runs. First visit shows a single bar.</p>
+          <p>
+            Histogram of the latest anomaly score runs. First visit shows a
+            single bar.
+          </p>
         </div>
-        <span>{loading ? "Loading..." : `${chartData.length} run${chartData.length === 1 ? "" : "s"}`}</span>
+        <span>
+          {loading
+            ? "Loading..."
+            : `${chartData.length} run${chartData.length === 1 ? "" : "s"}`}
+        </span>
       </div>
       <div className="recharts-box">
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={chartData} margin={{ top: 8, right: 20, bottom: 8, left: 4 }}>
-            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
-            <XAxis dataKey="run" stroke="#9fb2ca" tickLine={false} axisLine={false} />
-            <YAxis stroke="#9fb2ca" tickLine={false} axisLine={false} domain={[0, 1]} />
+          <BarChart
+            data={chartData}
+            margin={{ top: 8, right: 20, bottom: 8, left: 4 }}
+          >
+            <CartesianGrid
+              stroke="rgba(185, 201, 225, 0.12)"
+              strokeDasharray="4 4"
+            />
+            <XAxis
+              dataKey="run"
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+              domain={[0, 1]}
+            />
             <Tooltip
               contentStyle={{
                 background: "rgba(10, 17, 29, 0.96)",
@@ -2677,7 +3543,10 @@ function ScoreHistogramCard({ history, currentScore, loading }) {
             />
             <Bar dataKey="score" radius={[8, 8, 0, 0]}>
               {chartData.map((entry, index) => (
-                <Cell key={`hist-${entry.run}`} fill={index === chartData.length - 1 ? "#9cf1d2" : "#62d4ff"} />
+                <Cell
+                  key={`hist-${entry.run}`}
+                  fill={index === chartData.length - 1 ? "#9cf1d2" : "#62d4ff"}
+                />
               ))}
             </Bar>
           </BarChart>
@@ -2701,16 +3570,35 @@ function HistogramSeedCard({ currentScore }) {
       <div className="viz-card__head">
         <div>
           <strong>Score histogram</strong>
-          <p>First visit shows a single bar so the score is visible before reruns accumulate.</p>
+          <p>
+            First visit shows a single bar so the score is visible before reruns
+            accumulate.
+          </p>
         </div>
         <span>1 run</span>
       </div>
       <div className="recharts-box">
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={chartData} margin={{ top: 8, right: 20, bottom: 8, left: 4 }}>
-            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
-            <XAxis dataKey="run" stroke="#9fb2ca" tickLine={false} axisLine={false} />
-            <YAxis stroke="#9fb2ca" tickLine={false} axisLine={false} domain={[0, 1]} />
+          <BarChart
+            data={chartData}
+            margin={{ top: 8, right: 20, bottom: 8, left: 4 }}
+          >
+            <CartesianGrid
+              stroke="rgba(185, 201, 225, 0.12)"
+              strokeDasharray="4 4"
+            />
+            <XAxis
+              dataKey="run"
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+              domain={[0, 1]}
+            />
             <Tooltip
               contentStyle={{
                 background: "rgba(10, 17, 29, 0.96)",
@@ -2770,9 +3658,22 @@ function AnomalyTimelineCard({ series, loading, currentScore }) {
                 <stop offset="95%" stopColor="#f4a261" stopOpacity={0.04} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
-            <XAxis dataKey="label" stroke="#9fb2ca" tickLine={false} axisLine={false} />
-            <YAxis stroke="#9fb2ca" tickLine={false} axisLine={false} domain={[0, 1]} />
+            <CartesianGrid
+              stroke="rgba(185, 201, 225, 0.12)"
+              strokeDasharray="4 4"
+            />
+            <XAxis
+              dataKey="label"
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+              domain={[0, 1]}
+            />
             <Tooltip
               contentStyle={{
                 background: "rgba(10, 17, 29, 0.96)",
@@ -2781,13 +3682,23 @@ function AnomalyTimelineCard({ series, loading, currentScore }) {
                 color: "#edf3fb",
               }}
             />
-            <Area type="monotone" dataKey="score" stroke="#f4a261" strokeWidth={3} fill="url(#timelineAreaFill)" />
+            <Area
+              type="monotone"
+              dataKey="score"
+              stroke="#f4a261"
+              strokeWidth={3}
+              fill="url(#timelineAreaFill)"
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>
       <div className="viz-foot">
         <span>Latest score: {Math.round(latestScore * 100)}%</span>
-      <span>{isSeeded ? "Single-point baseline" : "Trend moves with each run and reset"}</span>
+        <span>
+          {isSeeded
+            ? "Single-point baseline"
+            : "Trend moves with each run and reset"}
+        </span>
       </div>
     </div>
   );
@@ -2801,21 +3712,33 @@ function PipelineTimelineCard({ stages }) {
       <div className="viz-card__head">
         <div>
           <strong>Pipeline timeline</strong>
-          <p>Each stage shows where the bundle sits in the feature engineering path.</p>
+          <p>
+            Each stage shows where the bundle sits in the feature engineering
+            path.
+          </p>
         </div>
         <span>{timelineStages.length} stages</span>
       </div>
       <div className="pipeline-timeline__list">
         {timelineStages.map((stage, index) => (
-          <article key={stage.name} className={`pipeline-timeline__item pipeline-timeline__item--${stage.status}`}>
-            <div className="pipeline-timeline__index">{String(index + 1).padStart(2, "0")}</div>
+          <article
+            key={stage.name}
+            className={`pipeline-timeline__item pipeline-timeline__item--${stage.status}`}
+          >
+            <div className="pipeline-timeline__index">
+              {String(index + 1).padStart(2, "0")}
+            </div>
             <div className="pipeline-timeline__body">
               <div className="pipeline-timeline__head">
                 <div>
                   <strong>{stage.name}</strong>
                   <p>{stage.detail}</p>
                 </div>
-                <span className={`pipeline-timeline__badge pipeline-timeline__badge--${stage.status}`}>{stage.status}</span>
+                <span
+                  className={`pipeline-timeline__badge pipeline-timeline__badge--${stage.status}`}
+                >
+                  {stage.status}
+                </span>
               </div>
               <div className="pipeline-timeline__meta">
                 <span>{stage.outputCount} outputs</span>
@@ -2838,11 +3761,15 @@ function ModelFamilyBadge({ family, label }) {
 }
 
 function ModelHubFamilyCard({ title, models, family, description }) {
-  const sortedModels = [...safeArray(models)].sort((a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0));
+  const sortedModels = [...safeArray(models)].sort(
+    (a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0),
+  );
   const bestModel = sortedModels[0] || null;
 
   return (
-    <section className={`model-hub-family model-hub-family--${family.toLowerCase()}`}>
+    <section
+      className={`model-hub-family model-hub-family--${family.toLowerCase()}`}
+    >
       <div className="section-card__head">
         <div>
           <p className="eyebrow">{family}</p>
@@ -2857,7 +3784,11 @@ function ModelHubFamilyCard({ title, models, family, description }) {
         </div>
         <div>
           <span>Best F1</span>
-          <strong>{bestModel ? `${Math.round((bestModel.f1 ?? bestModel.score ?? 0) * 100)}%` : "N/A"}</strong>
+          <strong>
+            {bestModel
+              ? `${Math.round((bestModel.f1 ?? bestModel.score ?? 0) * 100)}%`
+              : "N/A"}
+          </strong>
         </div>
         <div>
           <span>Best model</span>
@@ -2872,14 +3803,27 @@ function ModelHubFamilyCard({ title, models, family, description }) {
                 <strong>{model.name}</strong>
                 <p>{model.variantLabel}</p>
               </div>
-              <ModelFamilyBadge family={model.family} label={model.familyLabel} />
+              <ModelFamilyBadge
+                family={model.family}
+                label={model.familyLabel}
+              />
             </div>
-            <div className="model-hub-card__score">{Math.round((model.accuracy ?? model.f1 ?? model.score ?? 0) * 100)}%</div>
+            <div className="model-hub-card__score">
+              {Math.round(
+                (model.accuracy ?? model.f1 ?? model.score ?? 0) * 100,
+              )}
+              %
+            </div>
             <div className="model-hub-card__metrics">
-              <span>Accuracy {Math.round((model.accuracy ?? model.score ?? 0) * 100)}%</span>
+              <span>
+                Accuracy{" "}
+                {Math.round((model.accuracy ?? model.score ?? 0) * 100)}%
+              </span>
               <span>Latency {model.latencyMs ?? "N/A"} ms</span>
               <span>Memory {model.memoryMb ?? "N/A"} MB</span>
-              <span>AUC {Math.round((model.auc ?? model.score ?? 0) * 100)}%</span>
+              <span>
+                AUC {Math.round((model.auc ?? model.score ?? 0) * 100)}%
+              </span>
             </div>
           </article>
         ))}
@@ -2889,14 +3833,20 @@ function ModelHubFamilyCard({ title, models, family, description }) {
 }
 
 function ModelHubOverview({ groups, activeModel }) {
-  const overallBest = [...groups.catalog].sort((a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0))[0] || null;
+  const overallBest =
+    [...groups.catalog].sort(
+      (a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0),
+    )[0] || null;
 
   return (
     <div className="model-hub-overview">
       <div className="viz-card__head">
         <div>
           <strong>Trained model hub</strong>
-          <p>All trained models are organized by family so the ML and DL branches are easy to compare.</p>
+          <p>
+            All trained models are organized by family so the ML and DL branches
+            are easy to compare.
+          </p>
         </div>
         <span>{groups.allCount} trained models</span>
       </div>
@@ -2930,11 +3880,21 @@ function ModelHubOverview({ groups, activeModel }) {
   );
 }
 
-function ModelHubExplainabilityCard({ activeModel, primaryModel, modelResults }) {
-  const attributionSource = modelResults?.shapSummary?.length ? modelResults.shapSummary : modelResults?.featureAttributions || [];
+function ModelHubExplainabilityCard({
+  activeModel,
+  primaryModel,
+  modelResults,
+}) {
+  const attributionSource = modelResults?.shapSummary?.length
+    ? modelResults.shapSummary
+    : modelResults?.featureAttributions || [];
   const explanationSignals = normalizeShapValues(attributionSource).slice(0, 5);
   const strongestSignal = explanationSignals[0] || null;
-  const scoreLead = activeModel && primaryModel ? (primaryModel.f1 ?? primaryModel.score ?? 0) - (activeModel.f1 ?? activeModel.score ?? 0) : 0;
+  const scoreLead =
+    activeModel && primaryModel
+      ? (primaryModel.f1 ?? primaryModel.score ?? 0) -
+        (activeModel.f1 ?? activeModel.score ?? 0)
+      : 0;
   const explanationNote = explanationSignals.length
     ? "Current patient-level attributions are available from the latest analysis run."
     : "No patient-level attribution bundle is loaded yet, so the hub is showing model-level justification.";
@@ -2944,7 +3904,10 @@ function ModelHubExplainabilityCard({ activeModel, primaryModel, modelResults })
       <div className="viz-card__head">
         <div>
           <strong>Explainability</strong>
-          <p>Why the selected model is trusted, and which signals currently matter most.</p>
+          <p>
+            Why the selected model is trusted, and which signals currently
+            matter most.
+          </p>
         </div>
         <span>{strongestSignal ? "Live attributions" : "Model rationale"}</span>
       </div>
@@ -2969,20 +3932,33 @@ function ModelHubExplainabilityCard({ activeModel, primaryModel, modelResults })
       <div className="model-hub-explainability__signals">
         {explanationSignals.length ? (
           explanationSignals.map((signal) => (
-            <div key={signal.feature} className="model-hub-explainability__signal">
+            <div
+              key={signal.feature}
+              className="model-hub-explainability__signal"
+            >
               <div className="model-hub-explainability__signal-head">
                 <span>{signal.feature}</span>
                 <strong>{Math.round((signal.contribution ?? 0) * 100)}%</strong>
               </div>
-              <div className="model-hub-explainability__bar-track" aria-hidden="true">
+              <div
+                className="model-hub-explainability__bar-track"
+                aria-hidden="true"
+              >
                 <div
                   className={`model-hub-explainability__bar model-hub-explainability__bar--${signal.direction === "negative" ? "negative" : "positive"}`}
-                  style={{ width: `${Math.max(8, Math.round((signal.contribution ?? 0) * 100))}%` }}
+                  style={{
+                    width: `${Math.max(8, Math.round((signal.contribution ?? 0) * 100))}%`,
+                  }}
                 />
               </div>
               <p>
-                {signal.direction === "negative" ? "Suppressing" : "Amplifying"} the decision with a raw value of{" "}
-                {signal.value === "" || signal.value === null || signal.value === undefined ? "N/A" : signal.value}
+                {signal.direction === "negative" ? "Suppressing" : "Amplifying"}{" "}
+                the decision with a raw value of{" "}
+                {signal.value === "" ||
+                signal.value === null ||
+                signal.value === undefined
+                  ? "N/A"
+                  : signal.value}
                 .
               </p>
             </div>
@@ -2991,7 +3967,8 @@ function ModelHubExplainabilityCard({ activeModel, primaryModel, modelResults })
           <div className="model-hub-explainability__empty">
             <strong>Waiting for analysis output</strong>
             <p>
-              Run the comparative analysis page to populate feature attributions and reveal the strongest patient-level drivers.
+              Run the comparative analysis page to populate feature attributions
+              and reveal the strongest patient-level drivers.
             </p>
           </div>
         )}
@@ -3002,24 +3979,32 @@ function ModelHubExplainabilityCard({ activeModel, primaryModel, modelResults })
 }
 
 function DecisionConsensusCard({ models }) {
-  const sortedModels = normalizeComparisonModels(models).sort((a, b) => b.score - a.score);
+  const sortedModels = normalizeComparisonModels(models).sort(
+    (a, b) => b.score - a.score,
+  );
   const topModels = sortedModels.slice(0, 4);
   const consensusScore = topModels.length
     ? topModels.reduce((sum, model) => sum + model.score, 0) / topModels.length
     : 0;
-  const scoreSpread = topModels.length > 1 ? topModels[0].score - topModels[topModels.length - 1].score : 0;
-  const dominantBand = topModels.filter((model) => model.band === "High").length >= 2
-    ? "High"
-    : topModels.filter((model) => model.band === "Medium").length >= 2
-      ? "Medium"
-      : "Low";
+  const scoreSpread =
+    topModels.length > 1
+      ? topModels[0].score - topModels[topModels.length - 1].score
+      : 0;
+  const dominantBand =
+    topModels.filter((model) => model.band === "High").length >= 2
+      ? "High"
+      : topModels.filter((model) => model.band === "Medium").length >= 2
+        ? "Medium"
+        : "Low";
 
   return (
     <div className="decision-consensus-card">
       <div className="viz-card__head">
         <div>
           <strong>Model consensus display</strong>
-          <p>Top models are grouped to show how strongly the ensemble agrees.</p>
+          <p>
+            Top models are grouped to show how strongly the ensemble agrees.
+          </p>
         </div>
         <span>{Math.round(consensusScore * 100)}% consensus</span>
       </div>
@@ -3054,13 +4039,21 @@ function DecisionConsensusCard({ models }) {
 }
 
 function DecisionRiskMap({ models }) {
-  const sortedModels = normalizeComparisonModels(models).sort((a, b) => b.score - a.score);
-  const [selectedKey, setSelectedKey] = React.useState(sortedModels[0]?.key || null);
+  const sortedModels = normalizeComparisonModels(models).sort(
+    (a, b) => b.score - a.score,
+  );
+  const [selectedKey, setSelectedKey] = React.useState(
+    sortedModels[0]?.key || null,
+  );
   const width = 640;
   const height = 280;
   const padding = 40;
-  const latencies = sortedModels.map((model) => Number(model.latencyMs ?? 0)).filter(Number.isFinite);
-  const memoryValues = sortedModels.map((model) => Number(model.memoryMb ?? 0)).filter(Number.isFinite);
+  const latencies = sortedModels
+    .map((model) => Number(model.latencyMs ?? 0))
+    .filter(Number.isFinite);
+  const memoryValues = sortedModels
+    .map((model) => Number(model.memoryMb ?? 0))
+    .filter(Number.isFinite);
   const minLatency = Math.min(...latencies, 0);
   const maxLatency = Math.max(...latencies, 1);
   const minMemory = Math.min(...memoryValues, 0);
@@ -3069,7 +4062,10 @@ function DecisionRiskMap({ models }) {
   const points = sortedModels.map((model) => {
     const latency = Number(model.latencyMs ?? 0);
     const memory = Number(model.memoryMb ?? 0);
-    const x = padding + ((latency - minLatency) / Math.max(maxLatency - minLatency, 1)) * (width - padding * 2);
+    const x =
+      padding +
+      ((latency - minLatency) / Math.max(maxLatency - minLatency, 1)) *
+        (width - padding * 2);
     const scoreY = height - padding - model.score * (height - padding * 2);
     const y = scoreY;
     const radius = 7 + clamp01(memory / Math.max(maxMemory, 1)) * 7;
@@ -3081,7 +4077,10 @@ function DecisionRiskMap({ models }) {
     };
   });
   const selectedModel = React.useMemo(
-    () => sortedModels.find((model) => model.key === selectedKey) || sortedModels[0] || null,
+    () =>
+      sortedModels.find((model) => model.key === selectedKey) ||
+      sortedModels[0] ||
+      null,
     [selectedKey, sortedModels],
   );
 
@@ -3097,21 +4096,37 @@ function DecisionRiskMap({ models }) {
   }, [selectedKey, sortedModels]);
 
   return (
-    <div className={`decision-risk-map${selectedModel ? " decision-risk-map--active" : ""}`}>
+    <div
+      className={`decision-risk-map${selectedModel ? " decision-risk-map--active" : ""}`}
+    >
       <div className="viz-card__head">
         <div>
           <strong>Risk map</strong>
-          <p>Latency and score are plotted together so the safest operational choice stands out.</p>
+          <p>
+            Latency and score are plotted together so the safest operational
+            choice stands out.
+          </p>
         </div>
         <span>{sortedModels.length} models</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="viz-svg decision-risk-map__svg" role="img" aria-label="Decision support risk map">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="viz-svg decision-risk-map__svg"
+        role="img"
+        aria-label="Decision support risk map"
+      >
         <defs>
           <linearGradient id="decisionRiskFillLow" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="rgba(143,241,207,0.9)" />
             <stop offset="100%" stopColor="rgba(143,241,207,0.4)" />
           </linearGradient>
-          <linearGradient id="decisionRiskFillMedium" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient
+            id="decisionRiskFillMedium"
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="1"
+          >
             <stop offset="0%" stopColor="rgba(255,203,109,0.9)" />
             <stop offset="100%" stopColor="rgba(255,203,109,0.4)" />
           </linearGradient>
@@ -3120,9 +4135,25 @@ function DecisionRiskMap({ models }) {
             <stop offset="100%" stopColor="rgba(255,127,150,0.4)" />
           </linearGradient>
         </defs>
-        <line x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} className="viz-threshold" />
-        <line x1={padding} x2={padding} y1={padding} y2={height - padding} className="viz-threshold" />
-        <text x={width - padding} y={height - 12} className="viz-label viz-label--threshold">
+        <line
+          x1={padding}
+          x2={width - padding}
+          y1={height - padding}
+          y2={height - padding}
+          className="viz-threshold"
+        />
+        <line
+          x1={padding}
+          x2={padding}
+          y1={padding}
+          y2={height - padding}
+          className="viz-threshold"
+        />
+        <text
+          x={width - padding}
+          y={height - 12}
+          className="viz-label viz-label--threshold"
+        >
           Latency
         </text>
         <text x={14} y={padding + 4} className="viz-label viz-label--axis">
@@ -3152,7 +4183,12 @@ function DecisionRiskMap({ models }) {
               }}
             >
               {isSelected ? (
-                <circle cx={point.x} cy={point.y} r={point.radius + 11} className="decision-risk-map__pulse" />
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r={point.radius + 11}
+                  className="decision-risk-map__pulse"
+                />
               ) : null}
               <circle
                 cx={point.x}
@@ -3185,13 +4221,15 @@ function DecisionRiskMap({ models }) {
         <div>
           <span>Latency range</span>
           <strong>
-            {Number.isFinite(minLatency) ? minLatency.toFixed(1) : "0.0"} to {Number.isFinite(maxLatency) ? maxLatency.toFixed(1) : "0.0"} ms
+            {Number.isFinite(minLatency) ? minLatency.toFixed(1) : "0.0"} to{" "}
+            {Number.isFinite(maxLatency) ? maxLatency.toFixed(1) : "0.0"} ms
           </strong>
         </div>
         <div>
           <span>Memory range</span>
           <strong>
-            {Number.isFinite(minMemory) ? Math.round(minMemory) : 0} to {Number.isFinite(maxMemory) ? Math.round(maxMemory) : 0} MB
+            {Number.isFinite(minMemory) ? Math.round(minMemory) : 0} to{" "}
+            {Number.isFinite(maxMemory) ? Math.round(maxMemory) : 0} MB
           </strong>
         </div>
       </div>
@@ -3202,14 +4240,18 @@ function DecisionRiskMap({ models }) {
               <span>Selected point</span>
               <strong>{selectedModel.name}</strong>
             </div>
-            <span className={`model-family-badge model-family-badge--${String(selectedModel.family || "").toLowerCase()}`}>
+            <span
+              className={`model-family-badge model-family-badge--${String(selectedModel.family || "").toLowerCase()}`}
+            >
               {selectedModel.familyLabel || selectedModel.family || "Model"}
             </span>
           </div>
           <div className="decision-risk-map__selection-grid">
             <div>
               <span>Family</span>
-              <strong>{selectedModel.familyLabel || selectedModel.family || "Model"}</strong>
+              <strong>
+                {selectedModel.familyLabel || selectedModel.family || "Model"}
+              </strong>
             </div>
             <div>
               <span>Score</span>
@@ -3217,11 +4259,15 @@ function DecisionRiskMap({ models }) {
             </div>
             <div>
               <span>Latency</span>
-              <strong>{Number(selectedModel.latencyMs ?? 0).toFixed(1)} ms</strong>
+              <strong>
+                {Number(selectedModel.latencyMs ?? 0).toFixed(1)} ms
+              </strong>
             </div>
             <div>
               <span>Memory</span>
-              <strong>{Math.round(Number(selectedModel.memoryMb ?? 0))} MB</strong>
+              <strong>
+                {Math.round(Number(selectedModel.memoryMb ?? 0))} MB
+              </strong>
             </div>
           </div>
         </div>
@@ -3242,18 +4288,44 @@ function FeatureEngineeringChart({ features }) {
       <div className="viz-card__head">
         <div>
           <strong>Feature engineering output</strong>
-          <p>Derived features are normalized so the model processing hub can score them consistently.</p>
+          <p>
+            Derived features are normalized so the model processing hub can
+            score them consistently.
+          </p>
         </div>
         <span>{chartData.length} features</span>
       </div>
       <div className="recharts-box">
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 20, bottom: 8, left: 24 }}>
-            <CartesianGrid stroke="rgba(185, 201, 225, 0.12)" strokeDasharray="4 4" />
-            <XAxis type="number" stroke="#9fb2ca" tickLine={false} axisLine={false} domain={[0, 1]} />
-            <YAxis type="category" dataKey="name" stroke="#9fb2ca" tickLine={false} axisLine={false} width={130} />
+          <BarChart
+            data={chartData}
+            layout="vertical"
+            margin={{ top: 8, right: 20, bottom: 8, left: 24 }}
+          >
+            <CartesianGrid
+              stroke="rgba(185, 201, 225, 0.12)"
+              strokeDasharray="4 4"
+            />
+            <XAxis
+              type="number"
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+              domain={[0, 1]}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              stroke="#9fb2ca"
+              tickLine={false}
+              axisLine={false}
+              width={130}
+            />
             <Tooltip
-              formatter={(value, name, entry) => [`${Math.round(Number(value) * 100)}%`, entry.payload.group || name]}
+              formatter={(value, name, entry) => [
+                `${Math.round(Number(value) * 100)}%`,
+                entry.payload.group || name,
+              ]}
               contentStyle={{
                 background: "rgba(10, 17, 29, 0.96)",
                 border: "1px solid rgba(185, 201, 225, 0.18)",
@@ -3265,7 +4337,15 @@ function FeatureEngineeringChart({ features }) {
               {chartData.map((entry, index) => (
                 <Cell
                   key={`feature-${entry.name}`}
-                  fill={index < 2 ? "#9cf1d2" : index < 4 ? "#72d7ff" : index < 6 ? "#f4a261" : "#ff7f96"}
+                  fill={
+                    index < 2
+                      ? "#9cf1d2"
+                      : index < 4
+                        ? "#72d7ff"
+                        : index < 6
+                          ? "#f4a261"
+                          : "#ff7f96"
+                  }
                 />
               ))}
             </Bar>
@@ -3313,7 +4393,10 @@ async function submitModelConfig(payload) {
     };
   } catch (error) {
     if (typeof window !== "undefined" && window.localStorage) {
-      window.localStorage.setItem("latest-model-config", JSON.stringify(payload));
+      window.localStorage.setItem(
+        "latest-model-config",
+        JSON.stringify(payload),
+      );
       return {
         source: "local",
         data: payload,
@@ -3330,7 +4413,9 @@ function buildFeatureEngineeringPipeline(patient) {
   const demographics = patient.demographics || {};
 
   const rawFields = [...Object.values(labs), ...Object.values(measurements)];
-  const missingCount = rawFields.filter((value) => String(value ?? "").trim() === "").length;
+  const missingCount = rawFields.filter(
+    (value) => String(value ?? "").trim() === "",
+  ).length;
 
   const parsed = {
     fastingGlucose: parseNumeric(labs.fastingGlucose),
@@ -3366,19 +4451,30 @@ function buildFeatureEngineeringPipeline(patient) {
   const engineeredFeatures = [
     {
       name: "Glycemic pressure",
-      value: clamp01(((parsed.fastingGlucose - 70) / 60 + (parsed.postprandialGlucose - 140) / 120 + (parsed.hba1c - 5.6) / 4) / 3 + 0.25),
+      value: clamp01(
+        ((parsed.fastingGlucose - 70) / 60 +
+          (parsed.postprandialGlucose - 140) / 120 +
+          (parsed.hba1c - 5.6) / 4) /
+          3 +
+          0.25,
+      ),
       group: "Metabolic",
       source: "fasting glucose, postprandial glucose, HbA1c",
     },
     {
       name: "Glucose gap",
-      value: clamp01(Math.abs(parsed.postprandialGlucose - parsed.fastingGlucose) / 180),
+      value: clamp01(
+        Math.abs(parsed.postprandialGlucose - parsed.fastingGlucose) / 180,
+      ),
       group: "Interaction",
       source: "postprandial glucose - fasting glucose",
     },
     {
       name: "Blood pressure strain",
-      value: clamp01(((parsed.systolicBp - 120) / 40 + (parsed.diastolicBp - 80) / 20) / 2 + 0.25),
+      value: clamp01(
+        ((parsed.systolicBp - 120) / 40 + (parsed.diastolicBp - 80) / 20) / 2 +
+          0.25,
+      ),
       group: "Vitals",
       source: "systolic BP, diastolic BP",
     },
@@ -3390,7 +4486,13 @@ function buildFeatureEngineeringPipeline(patient) {
     },
     {
       name: "Renal burden",
-      value: clamp01(((parsed.creatinine - 0.9) / 1.5 + (parsed.urea - 20) / 40 + (90 - parsed.egfr) / 60) / 3 + 0.15),
+      value: clamp01(
+        ((parsed.creatinine - 0.9) / 1.5 +
+          (parsed.urea - 20) / 40 +
+          (90 - parsed.egfr) / 60) /
+          3 +
+          0.15,
+      ),
       group: "Renal",
       source: "creatinine, urea, eGFR",
     },
@@ -3408,21 +4510,32 @@ function buildFeatureEngineeringPipeline(patient) {
     },
     {
       name: "Hematology stress",
-      value: clamp01(((14 - parsed.hemoglobin) / 4 + (parsed.wbcCount - 7) / 8 + (parsed.plateletCount - 250) / 250) / 3 + 0.2),
+      value: clamp01(
+        ((14 - parsed.hemoglobin) / 4 +
+          (parsed.wbcCount - 7) / 8 +
+          (parsed.plateletCount - 250) / 250) /
+          3 +
+          0.2,
+      ),
       group: "Hematology",
       source: "hemoglobin, WBC count, platelet count",
     },
     {
       name: "Liver load",
       value: clamp01(
-        ((parsed.ast - 25) / 25 + (parsed.alt - 30) / 35 + (parsed.bilirubin - 0.8) / 1.2 + (4.2 - parsed.albumin) / 1.2) / 4 + 0.2,
+        ((parsed.ast - 25) / 25 +
+          (parsed.alt - 30) / 35 +
+          (parsed.bilirubin - 0.8) / 1.2 +
+          (4.2 - parsed.albumin) / 1.2) /
+          4 +
+          0.2,
       ),
       group: "Hepatic",
       source: "AST, ALT, bilirubin, albumin",
     },
     {
       name: "Body size proxy",
-      value: clamp01((parsed.weight / Math.max(parsed.height, 1)) / 2),
+      value: clamp01(parsed.weight / Math.max(parsed.height, 1) / 2),
       group: "Anthropometric",
       source: "weight, height",
     },
@@ -3441,7 +4554,11 @@ function buildFeatureEngineeringPipeline(patient) {
     {
       name: `sex_${categoricalSources.sex.toLowerCase()}`,
       value: clamp01(
-        categoricalSources.sex === "Female" ? 1 : categoricalSources.sex === "Male" ? 0.82 : 0.5,
+        categoricalSources.sex === "Female"
+          ? 1
+          : categoricalSources.sex === "Male"
+            ? 0.82
+            : 0.5,
       ),
       group: "Encoding",
       source: "patient demographics sex",
@@ -3449,7 +4566,11 @@ function buildFeatureEngineeringPipeline(patient) {
     {
       name: `location_${categoricalSources.locationType.toLowerCase()}`,
       value: clamp01(
-        categoricalSources.locationType === "Clinic" ? 0.68 : categoricalSources.locationType === "Home" ? 0.4 : 0.85,
+        categoricalSources.locationType === "Clinic"
+          ? 0.68
+          : categoricalSources.locationType === "Home"
+            ? 0.4
+            : 0.85,
       ),
       group: "Encoding",
       source: "visit location type",
@@ -3498,13 +4619,15 @@ function buildFeatureEngineeringPipeline(patient) {
     {
       name: "Encode categories",
       status: "complete",
-      detail: "Categorical fields are encoded into model-friendly numeric signals.",
+      detail:
+        "Categorical fields are encoded into model-friendly numeric signals.",
       outputCount: encodedFeatures.length,
     },
     {
       name: "Engineer features",
       status: "complete",
-      detail: "Interaction and domain-specific features are derived for model input.",
+      detail:
+        "Interaction and domain-specific features are derived for model input.",
       outputCount: engineeredFeatures.length,
     },
     {
@@ -3516,9 +4639,15 @@ function buildFeatureEngineeringPipeline(patient) {
   ];
 
   const featureBundleCount = engineeredFeatures.length + encodedFeatures.length;
-  const estimatedLatencyMs = Math.round(18 + featureBundleCount * 1.8 + missingCount * 2.4);
-  const estimatedThroughput = Math.round(Math.max(18, 1200 / Math.max(estimatedLatencyMs, 1)));
-  const estimatedBundleSizeKb = Math.round(42 + featureBundleCount * 3.6 + missingCount * 1.2);
+  const estimatedLatencyMs = Math.round(
+    18 + featureBundleCount * 1.8 + missingCount * 2.4,
+  );
+  const estimatedThroughput = Math.round(
+    Math.max(18, 1200 / Math.max(estimatedLatencyMs, 1)),
+  );
+  const estimatedBundleSizeKb = Math.round(
+    42 + featureBundleCount * 3.6 + missingCount * 1.2,
+  );
   const estimatedMemoryMb = Math.round(62 + featureBundleCount * 1.7);
 
   return {
@@ -3535,7 +4664,8 @@ function buildFeatureEngineeringPipeline(patient) {
     stages,
     encodedFeatures,
     engineeredFeatures,
-    pipelineStatus: missingCount === 0 ? "Ready for scoring" : "Validation warning",
+    pipelineStatus:
+      missingCount === 0 ? "Ready for scoring" : "Validation warning",
   };
 }
 
@@ -3685,10 +4815,20 @@ function buildPatientCareInsights(patient) {
     measurements.weight,
     measurements.height,
   ].some((value) => String(value ?? "").trim() !== "");
-  const hasPage2Data = Object.values(labs).some((value) => String(value ?? "").trim() !== "");
+  const hasPage2Data = Object.values(labs).some(
+    (value) => String(value ?? "").trim() !== "",
+  );
 
   if (!hasPage1Data || !hasPage2Data) {
-    const zeroDomains = ["Vitals", "Blood sugar", "Blood", "Lipids", "Liver", "Kidney", "Electrolytes"].map((label) => ({
+    const zeroDomains = [
+      "Vitals",
+      "Blood sugar",
+      "Blood",
+      "Lipids",
+      "Liver",
+      "Kidney",
+      "Electrolytes",
+    ].map((label) => ({
       label,
       value: 0,
       count: 0,
@@ -3720,7 +4860,10 @@ function buildPatientCareInsights(patient) {
 
   const bmiWeight = parseNumeric(measurements.weight);
   const bmiHeightMeters = parseNumeric(measurements.height) / 100;
-  const bmi = bmiWeight > 0 && bmiHeightMeters > 0 ? bmiWeight / (bmiHeightMeters * bmiHeightMeters) : 0;
+  const bmi =
+    bmiWeight > 0 && bmiHeightMeters > 0
+      ? bmiWeight / (bmiHeightMeters * bmiHeightMeters)
+      : 0;
 
   const checks = [
     {
@@ -3761,7 +4904,10 @@ function buildPatientCareInsights(patient) {
       source: intakeSourceLabel,
       domain: "Vitals",
       label: "Blood pressure",
-      value: measurements.systolicBp && measurements.diastolicBp ? `${measurements.systolicBp}/${measurements.diastolicBp}` : "",
+      value:
+        measurements.systolicBp && measurements.diastolicBp
+          ? `${measurements.systolicBp}/${measurements.diastolicBp}`
+          : "",
       required: true,
       min: careInsightRanges.systolicBp[0],
       max: careInsightRanges.systolicBp[1],
@@ -3990,7 +5136,8 @@ function buildPatientCareInsights(patient) {
       const comparableValue = check.scoreValue ?? rawValue;
       const numeric = Number(comparableValue);
       const missing = !isFilled(rawValue);
-      const rangeDefined = Number.isFinite(check.min) || Number.isFinite(check.max);
+      const rangeDefined =
+        Number.isFinite(check.min) || Number.isFinite(check.max);
       let severity = 0;
       let status = "ok";
       let note = "";
@@ -4003,8 +5150,12 @@ function buildPatientCareInsights(patient) {
         status = "needs attention";
         note = "This field is still blank.";
       } else if (Number.isFinite(numeric) && rangeDefined) {
-        const below = Number.isFinite(check.min) ? Math.max(0, (check.min - numeric) / Math.max(check.min, 1)) : 0;
-        const above = Number.isFinite(check.max) ? Math.max(0, (numeric - check.max) / Math.max(check.max, 1)) : 0;
+        const below = Number.isFinite(check.min)
+          ? Math.max(0, (check.min - numeric) / Math.max(check.min, 1))
+          : 0;
+        const above = Number.isFinite(check.max)
+          ? Math.max(0, (numeric - check.max) / Math.max(check.max, 1))
+          : 0;
         severity = clamp01(Math.max(below, above));
         if (severity > 0) {
           status = severity >= 0.45 ? "needs attention" : "watch";
@@ -4029,18 +5180,31 @@ function buildPatientCareInsights(patient) {
         severity,
         status,
         note: note || check.suggestion,
-        valueLabel: missing ? "Missing" : check.label === "Blood pressure" ? `${measurements.systolicBp || "?"}/${measurements.diastolicBp || "?"}` : String(rawValue),
+        valueLabel: missing
+          ? "Missing"
+          : check.label === "Blood pressure"
+            ? `${measurements.systolicBp || "?"}/${measurements.diastolicBp || "?"}`
+            : String(rawValue),
       };
     })
     .filter(Boolean)
     .filter(Boolean)
     .sort((a, b) => b.severity - a.severity);
 
-  const domainBuckets = ["Vitals", "Blood sugar", "Blood", "Lipids", "Liver", "Kidney", "Electrolytes"];
+  const domainBuckets = [
+    "Vitals",
+    "Blood sugar",
+    "Blood",
+    "Lipids",
+    "Liver",
+    "Kidney",
+    "Electrolytes",
+  ];
   const domainScores = domainBuckets.map((domain) => {
     const domainChecks = anomalies.filter((item) => item.domain === domain);
     const score = domainChecks.length
-      ? domainChecks.reduce((sum, item) => sum + item.severity, 0) / domainChecks.length
+      ? domainChecks.reduce((sum, item) => sum + item.severity, 0) /
+        domainChecks.length
       : 0;
     return {
       label: domain,
@@ -4049,12 +5213,17 @@ function buildPatientCareInsights(patient) {
     };
   });
 
-  const page1Anomalies = anomalies.filter((item) => item.source === intakeSourceLabel).length;
-  const page2Anomalies = anomalies.filter((item) => item.source === labSourceLabel).length;
+  const page1Anomalies = anomalies.filter(
+    (item) => item.source === intakeSourceLabel,
+  ).length;
+  const page2Anomalies = anomalies.filter(
+    (item) => item.source === labSourceLabel,
+  ).length;
   const totalSeverity = anomalies.length
     ? anomalies.reduce((sum, item) => sum + item.severity, 0) / anomalies.length
     : 0;
-  const riskLevel = totalSeverity >= 0.55 ? "High" : totalSeverity >= 0.28 ? "Medium" : "Low";
+  const riskLevel =
+    totalSeverity >= 0.55 ? "High" : totalSeverity >= 0.28 ? "Medium" : "Low";
   const suggestionSet = [
     anomalies.some((item) => item.domain === "Intake")
       ? "Finish the blank intake fields so the record is complete."
@@ -4065,7 +5234,9 @@ function buildPatientCareInsights(patient) {
     anomalies.some((item) => item.domain === "Blood sugar")
       ? "Review blood sugar control, meal timing, and medicine use."
       : "Blood sugar values are not standing out right now.",
-    anomalies.some((item) => item.domain === "Kidney" || item.domain === "Electrolytes")
+    anomalies.some(
+      (item) => item.domain === "Kidney" || item.domain === "Electrolytes",
+    )
       ? "Watch hydration and review kidney-related results."
       : "Kidney and salt balance look steady.",
   ];
@@ -4134,7 +5305,9 @@ function buildSafePatientCareInsights(patient) {
       ],
       riskLevel: "Low",
       summary: ["No care insights could be computed for this record."],
-      suggestionSet: ["Check the source fields for missing or malformed values."],
+      suggestionSet: [
+        "Check the source fields for missing or malformed values.",
+      ],
       totalSeverity: 0,
       page1Anomalies: 0,
       page2Anomalies: 0,
@@ -4158,11 +5331,19 @@ function buildStackingConfig(patient) {
   const hiddenLayerSizes = parseLayerSizes(tuning.stackingHiddenLayerSizes);
   return {
     stacking_meta_model_type: String(tuning.stackingMetaModelType || "mlp"),
-    stacking_hidden_layer_sizes: hiddenLayerSizes.length ? hiddenLayerSizes : [32, 16],
+    stacking_hidden_layer_sizes: hiddenLayerSizes.length
+      ? hiddenLayerSizes
+      : [32, 16],
     stacking_alpha: Number(tuning.stackingAlpha ?? 1e-4) || 0,
-    stacking_learning_rate_init: Number(tuning.stackingLearningRateInit ?? 1e-3) || 0,
-    stacking_max_iter: Math.max(1, Math.round(Number(tuning.stackingMaxIter ?? 500) || 500)),
-    stacking_random_state: Math.round(Number(tuning.stackingRandomState ?? 42) || 42),
+    stacking_learning_rate_init:
+      Number(tuning.stackingLearningRateInit ?? 1e-3) || 0,
+    stacking_max_iter: Math.max(
+      1,
+      Math.round(Number(tuning.stackingMaxIter ?? 500) || 500),
+    ),
+    stacking_random_state: Math.round(
+      Number(tuning.stackingRandomState ?? 42) || 42,
+    ),
     stacking_verbose: Boolean(tuning.stackingVerbose),
   };
 }
@@ -4221,7 +5402,9 @@ function LabField({ field, register, error, value, onAutoFill }) {
       />
       <span className="lab-field__help">Use the number from the report.</span>
       <div className="lab-field__meta">
-        <span className={`lab-range${withinRange === null ? "" : withinRange ? " is-good" : " is-warn"}`}>
+        <span
+          className={`lab-range${withinRange === null ? "" : withinRange ? " is-good" : " is-warn"}`}
+        >
           {hint}
         </span>
         {field.unit ? <span className="lab-unit">{field.unit}</span> : null}
@@ -4237,7 +5420,10 @@ function emptyLabRecord() {
 
 function mapParsedLabValues(source) {
   const normalized = {};
-  const entries = source instanceof Map ? Array.from(source.entries()) : Object.entries(source || {});
+  const entries =
+    source instanceof Map
+      ? Array.from(source.entries())
+      : Object.entries(source || {});
 
   for (const [rawKey, rawValue] of entries) {
     const key = String(rawKey).trim().toLowerCase();
@@ -4266,7 +5452,9 @@ function parseLabText(text) {
   const lowerText = text.toLowerCase();
 
   for (const field of labFieldSpecs) {
-    const aliasPattern = field.aliases.map((alias) => alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const aliasPattern = field.aliases
+      .map((alias) => alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|");
     const regex = new RegExp(
       `(?:${aliasPattern})\\s*(?:[:=\\-]|is|value)?\\s*([-+]?\\d+(?:\\.\\d+)?)`,
       "i",
@@ -4391,15 +5579,24 @@ function computeAnalysisResults(patient, priorHistory = []) {
 
   const totalDeviation = severitySignals.reduce((sum, value) => sum + value, 0);
   const overallScore = clamp01(0.22 + totalDeviation / 18);
-  const riskLevel = overallScore >= 0.7 ? "High" : overallScore >= 0.4 ? "Medium" : "Low";
-  const primaryModel = analysisModelCatalog.reduce((best, model) => (model.f1 > best.f1 ? model : best), analysisModelCatalog[0]);
+  const riskLevel =
+    overallScore >= 0.7 ? "High" : overallScore >= 0.4 ? "Medium" : "Low";
+  const primaryModel = analysisModelCatalog.reduce(
+    (best, model) => (model.f1 > best.f1 ? model : best),
+    analysisModelCatalog[0],
+  );
 
   const modelRows = analysisModelCatalog.map((model, index) => {
     const offset = (overallScore - 0.4) * 0.12 - index * 0.006;
     return {
       ...model,
       score: clamp01(model.f1 + offset),
-      alert: index === analysisModelCatalog.length - 1 ? riskLevel : model.f1 > 0.84 ? "Stable" : "Review",
+      alert:
+        index === analysisModelCatalog.length - 1
+          ? riskLevel
+          : model.f1 > 0.84
+            ? "Stable"
+            : "Review",
     };
   });
 
@@ -4414,15 +5611,60 @@ function computeAnalysisResults(patient, priorHistory = []) {
   }));
 
   const featureAttributions = [
-    { feature: "HbA1c", value: parseNumeric(labs.hba1c), weight: 0.22, direction: "positive" },
-    { feature: "Postprandial glucose", value: parseNumeric(labs.postprandialGlucose), weight: 0.18, direction: "positive" },
-    { feature: "Fasting glucose", value: parseNumeric(labs.fastingGlucose), weight: 0.16, direction: "positive" },
-    { feature: "SpO2", value: parseNumeric(measurements.spo2), weight: 0.11, direction: "negative" },
-    { feature: "Hemoglobin", value: parseNumeric(labs.hemoglobin), weight: 0.08, direction: "negative" },
-    { feature: "Creatinine", value: parseNumeric(labs.creatinine), weight: 0.07, direction: "positive" },
-    { feature: "Systolic BP", value: parseNumeric(measurements.systolicBp), weight: 0.06, direction: "positive" },
-    { feature: "Sodium", value: parseNumeric(labs.sodium), weight: 0.05, direction: "positive" },
-    { feature: "HDL", value: parseNumeric(labs.hdl), weight: 0.04, direction: "negative" },
+    {
+      feature: "HbA1c",
+      value: parseNumeric(labs.hba1c),
+      weight: 0.22,
+      direction: "positive",
+    },
+    {
+      feature: "Postprandial glucose",
+      value: parseNumeric(labs.postprandialGlucose),
+      weight: 0.18,
+      direction: "positive",
+    },
+    {
+      feature: "Fasting glucose",
+      value: parseNumeric(labs.fastingGlucose),
+      weight: 0.16,
+      direction: "positive",
+    },
+    {
+      feature: "SpO2",
+      value: parseNumeric(measurements.spo2),
+      weight: 0.11,
+      direction: "negative",
+    },
+    {
+      feature: "Hemoglobin",
+      value: parseNumeric(labs.hemoglobin),
+      weight: 0.08,
+      direction: "negative",
+    },
+    {
+      feature: "Creatinine",
+      value: parseNumeric(labs.creatinine),
+      weight: 0.07,
+      direction: "positive",
+    },
+    {
+      feature: "Systolic BP",
+      value: parseNumeric(measurements.systolicBp),
+      weight: 0.06,
+      direction: "positive",
+    },
+    {
+      feature: "Sodium",
+      value: parseNumeric(labs.sodium),
+      weight: 0.05,
+      direction: "positive",
+    },
+    {
+      feature: "HDL",
+      value: parseNumeric(labs.hdl),
+      weight: 0.04,
+      direction: "negative",
+    },
   ]
     .map((entry) => ({
       ...entry,
@@ -4455,7 +5697,10 @@ function computeAnalysisResults(patient, priorHistory = []) {
     {
       label: "Diabetes",
       value: clamp(
-        (deviationFromRange(labs.fastingGlucose, 70, 99) + deviationFromRange(labs.postprandialGlucose, 0, 140) + deviationFromRange(labs.hba1c, 4.0, 5.6)) / 3,
+        (deviationFromRange(labs.fastingGlucose, 70, 99) +
+          deviationFromRange(labs.postprandialGlucose, 0, 140) +
+          deviationFromRange(labs.hba1c, 4.0, 5.6)) /
+          3,
         0,
         1,
       ),
@@ -4463,7 +5708,10 @@ function computeAnalysisResults(patient, priorHistory = []) {
     {
       label: "Blood",
       value: clamp(
-        (deviationFromRange(labs.hemoglobin, 12.0, 17.5) + deviationFromRange(labs.wbcCount, 4.0, 11.0) + deviationFromRange(labs.plateletCount, 150, 450)) / 3,
+        (deviationFromRange(labs.hemoglobin, 12.0, 17.5) +
+          deviationFromRange(labs.wbcCount, 4.0, 11.0) +
+          deviationFromRange(labs.plateletCount, 150, 450)) /
+          3,
         0,
         1,
       ),
@@ -4471,7 +5719,10 @@ function computeAnalysisResults(patient, priorHistory = []) {
     {
       label: "Lipid",
       value: clamp(
-        (deviationFromRange(labs.ldl, 0, 100) + deviationFromRange(labs.hdl, 40, Infinity) + deviationFromRange(labs.triglycerides, 0, 150)) / 3,
+        (deviationFromRange(labs.ldl, 0, 100) +
+          deviationFromRange(labs.hdl, 40, Infinity) +
+          deviationFromRange(labs.triglycerides, 0, 150)) /
+          3,
         0,
         1,
       ),
@@ -4479,7 +5730,11 @@ function computeAnalysisResults(patient, priorHistory = []) {
     {
       label: "Liver",
       value: clamp(
-        (deviationFromRange(labs.ast, 10, 40) + deviationFromRange(labs.alt, 7, 56) + deviationFromRange(labs.bilirubin, 0.1, 1.2) + deviationFromRange(labs.albumin, 3.5, 5.0)) / 4,
+        (deviationFromRange(labs.ast, 10, 40) +
+          deviationFromRange(labs.alt, 7, 56) +
+          deviationFromRange(labs.bilirubin, 0.1, 1.2) +
+          deviationFromRange(labs.albumin, 3.5, 5.0)) /
+          4,
         0,
         1,
       ),
@@ -4487,7 +5742,10 @@ function computeAnalysisResults(patient, priorHistory = []) {
     {
       label: "Kidney",
       value: clamp(
-        (deviationFromRange(labs.creatinine, 0.6, 1.3) + deviationFromRange(labs.urea, 7, 20) + deviationFromRange(labs.egfr, 90, Infinity)) / 3,
+        (deviationFromRange(labs.creatinine, 0.6, 1.3) +
+          deviationFromRange(labs.urea, 7, 20) +
+          deviationFromRange(labs.egfr, 90, Infinity)) /
+          3,
         0,
         1,
       ),
@@ -4495,7 +5753,11 @@ function computeAnalysisResults(patient, priorHistory = []) {
     {
       label: "Vitals",
       value: clamp(
-        (deviationFromRange(measurements.spo2, 95, 100) + deviationFromRange(measurements.temperature, 36.1, 37.2) + deviationFromRange(measurements.heartRate, 60, 100) + deviationFromRange(measurements.systolicBp, 90, 140)) / 4,
+        (deviationFromRange(measurements.spo2, 95, 100) +
+          deviationFromRange(measurements.temperature, 36.1, 37.2) +
+          deviationFromRange(measurements.heartRate, 60, 100) +
+          deviationFromRange(measurements.systolicBp, 90, 140)) /
+          4,
         0,
         1,
       ),
@@ -4507,13 +5769,22 @@ function computeAnalysisResults(patient, priorHistory = []) {
     value: entry.contribution,
     tone: index < 3 ? "critical" : index < 6 ? "elevated" : "moderate",
   }));
-  const shapInteractionHeatmap = buildFallbackShapInteractionHeatmap(featureAttributions);
+  const shapInteractionHeatmap =
+    buildFallbackShapInteractionHeatmap(featureAttributions);
 
   const previousEntry = priorHistory[priorHistory.length - 1] || null;
   const previousScore = previousEntry?.score ?? null;
   const previousRisk = previousEntry?.riskLevel ?? "Baseline";
-  const scoreDelta = previousScore === null ? overallScore : overallScore - previousScore;
-  const direction = previousScore === null ? "baseline" : scoreDelta < 0 ? "improving" : scoreDelta > 0 ? "worsening" : "stable";
+  const scoreDelta =
+    previousScore === null ? overallScore : overallScore - previousScore;
+  const direction =
+    previousScore === null
+      ? "baseline"
+      : scoreDelta < 0
+        ? "improving"
+        : scoreDelta > 0
+          ? "worsening"
+          : "stable";
   const trendHistory = [
     ...priorHistory,
     {
@@ -4527,7 +5798,8 @@ function computeAnalysisResults(patient, priorHistory = []) {
   const progression = [
     {
       label: "Before",
-      score: previousScore === null ? clamp01(overallScore + 0.08) : previousScore,
+      score:
+        previousScore === null ? clamp01(overallScore + 0.08) : previousScore,
       riskLevel: previousRisk,
       tone: "before",
     },
@@ -4575,22 +5847,31 @@ function getRiskAction(riskLevel) {
   if (riskLevel === "Medium") {
     return {
       title: "Prompt follow-up",
-      description: "Schedule short-interval review and reinforce self-management advice.",
+      description:
+        "Schedule short-interval review and reinforce self-management advice.",
     };
   }
   return {
     title: "Routine monitoring",
-    description: "Continue usual care with planned reassessment and routine observation.",
+    description:
+      "Continue usual care with planned reassessment and routine observation.",
   };
 }
 
-function buildDecisionSupportGuidance({ riskLevel, topSignals, comparisonRows, consensusScore, consensusSpread }) {
+function buildDecisionSupportGuidance({
+  riskLevel,
+  topSignals,
+  comparisonRows,
+  consensusScore,
+  consensusSpread,
+}) {
   const topSignalNames = safeArray(topSignals)
     .map((signal) => signal.feature || signal.name)
     .filter(Boolean)
     .slice(0, 3);
   const leaderName = comparisonRows[0]?.name || "the leading detector";
-  const trendDescriptor = consensusSpread >= 0.12 ? "closely grouped" : "spread out";
+  const trendDescriptor =
+    consensusSpread >= 0.12 ? "closely grouped" : "spread out";
 
   const immediateRecommendations = [];
   const followUpPlan = [];
@@ -4643,7 +5924,9 @@ function buildDecisionSupportGuidance({ riskLevel, topSignals, comparisonRows, c
     references.push(`Top signals to watch: ${topSignalNames.join(", ")}.`);
   }
 
-  references.push("Use the lab and vital reference ranges already loaded in this dashboard.");
+  references.push(
+    "Use the lab and vital reference ranges already loaded in this dashboard.",
+  );
 
   return {
     immediateRecommendations,
@@ -4672,7 +5955,11 @@ function pickSeries(data) {
 }
 
 function pickShapValues(data) {
-  const candidates = [data?.analysis?.shapValues, data?.shapValues, data?.featureAttributions];
+  const candidates = [
+    data?.analysis?.shapValues,
+    data?.shapValues,
+    data?.featureAttributions,
+  ];
   for (const candidate of candidates) {
     if (Array.isArray(candidate) && candidate.length) {
       return candidate;
@@ -4684,7 +5971,9 @@ function pickShapValues(data) {
 function normalizeTrendSeries(source) {
   return safeArray(source)
     .map((item, index) => {
-      const rawScore = Number(item.score ?? item.value ?? item.anomalyScore ?? item.risk ?? 0);
+      const rawScore = Number(
+        item.score ?? item.value ?? item.anomalyScore ?? item.risk ?? 0,
+      );
       const score = rawScore > 1 ? clamp01(rawScore / 100) : clamp01(rawScore);
       return {
         label: item.label ?? item.name ?? `T${index + 1}`,
@@ -4707,9 +5996,15 @@ function normalizeRadarMetrics(source) {
 function normalizeShapValues(source) {
   return safeArray(source)
     .map((item, index) => ({
-      feature: item.feature ?? item.label ?? item.name ?? `Feature ${index + 1}`,
-      contribution: clamp01(Number(item.contribution ?? item.value ?? item.score ?? 0)),
-      direction: item.direction ?? item.sign ?? (index % 2 === 0 ? "positive" : "negative"),
+      feature:
+        item.feature ?? item.label ?? item.name ?? `Feature ${index + 1}`,
+      contribution: clamp01(
+        Number(item.contribution ?? item.value ?? item.score ?? 0),
+      ),
+      direction:
+        item.direction ??
+        item.sign ??
+        (index % 2 === 0 ? "positive" : "negative"),
       value: item.value ?? item.rawValue ?? "",
     }))
     .filter((item) => item.feature);
@@ -4720,7 +6015,12 @@ function normalizeShapInteractionHeatmap(source) {
     return null;
   }
 
-  const featureNames = safeArray(source.feature_names ?? source.featureNames ?? source.labels ?? source.features)
+  const featureNames = safeArray(
+    source.feature_names ??
+      source.featureNames ??
+      source.labels ??
+      source.features,
+  )
     .map((item, index) => String(item || `Feature ${index + 1}`))
     .filter(Boolean);
   const matrix = safeArray(source.matrix ?? source.values ?? [])
@@ -4731,7 +6031,11 @@ function normalizeShapInteractionHeatmap(source) {
     return null;
   }
 
-  const trimmedSize = Math.min(featureNames.length, matrix.length, matrix[0].length || 0);
+  const trimmedSize = Math.min(
+    featureNames.length,
+    matrix.length,
+    matrix[0].length || 0,
+  );
   if (!trimmedSize) {
     return null;
   }
@@ -4740,7 +6044,9 @@ function normalizeShapInteractionHeatmap(source) {
     method: source.method ?? "tree_shap_interaction",
     sourceModel: source.source_model ?? source.sourceModel ?? "",
     featureNames: featureNames.slice(0, trimmedSize),
-    matrix: matrix.slice(0, trimmedSize).map((row) => row.slice(0, trimmedSize)),
+    matrix: matrix
+      .slice(0, trimmedSize)
+      .map((row) => row.slice(0, trimmedSize)),
     topPairs: safeArray(source.top_pairs ?? source.topPairs),
     topFeatures: safeArray(source.top_features ?? source.topFeatures),
   };
@@ -4762,21 +6068,31 @@ function buildFallbackShapInteractionHeatmap(features) {
   const matrix = featureNames.map((rowName, rowIndex) =>
     featureNames.map((colName, colIndex) => {
       if (rowIndex === colIndex) {
-        const direction = normalized[rowIndex].direction === "negative" ? -1 : 1;
+        const direction =
+          normalized[rowIndex].direction === "negative" ? -1 : 1;
         return direction * normalized[rowIndex].contribution;
       }
       const rowContribution = normalized[rowIndex].contribution;
       const colContribution = normalized[colIndex].contribution;
-      const sameDirection = normalized[rowIndex].direction === normalized[colIndex].direction;
-      const closeness = 1 - Math.abs(rowIndex - colIndex) / Math.max(featureNames.length - 1, 1);
-      const magnitude = Math.sqrt(Math.max(rowContribution, 0) * Math.max(colContribution, 0));
+      const sameDirection =
+        normalized[rowIndex].direction === normalized[colIndex].direction;
+      const closeness =
+        1 -
+        Math.abs(rowIndex - colIndex) / Math.max(featureNames.length - 1, 1);
+      const magnitude = Math.sqrt(
+        Math.max(rowContribution, 0) * Math.max(colContribution, 0),
+      );
       return (sameDirection ? 1 : -1) * magnitude * (0.35 + closeness * 0.55);
     }),
   );
 
   const topPairs = [];
   for (let rowIndex = 0; rowIndex < featureNames.length; rowIndex += 1) {
-    for (let colIndex = rowIndex + 1; colIndex < featureNames.length; colIndex += 1) {
+    for (
+      let colIndex = rowIndex + 1;
+      colIndex < featureNames.length;
+      colIndex += 1
+    ) {
       const value = matrix[rowIndex][colIndex];
       topPairs.push({
         feature_i: featureNames[rowIndex],
@@ -4787,7 +6103,9 @@ function buildFallbackShapInteractionHeatmap(features) {
     }
   }
 
-  topPairs.sort((a, b) => b.absolute_interaction_value - a.absolute_interaction_value);
+  topPairs.sort(
+    (a, b) => b.absolute_interaction_value - a.absolute_interaction_value,
+  );
 
   return {
     method: "local_interaction_proxy",
@@ -4831,8 +6149,12 @@ function normalizeLatentManifold(source) {
       label: point.label ?? point.name ?? `record-${index + 1}`,
       x: Number(point.x ?? 0),
       y: Number(point.y ?? 0),
-      anomalyScore: clamp01(Number(point.anomaly_score ?? point.anomalyScore ?? point.score ?? 0)),
-      deepSvddDistance: Number(point.deep_svdd_distance ?? point.deepSvddDistance ?? NaN),
+      anomalyScore: clamp01(
+        Number(point.anomaly_score ?? point.anomalyScore ?? point.score ?? 0),
+      ),
+      deepSvddDistance: Number(
+        point.deep_svdd_distance ?? point.deepSvddDistance ?? NaN,
+      ),
       isCurrent: Boolean(point.is_current ?? point.isCurrent ?? false),
       isAnomalous: Boolean(point.is_anomalous ?? point.isAnomalous ?? false),
     }))
@@ -4842,8 +6164,16 @@ function normalizeLatentManifold(source) {
     return null;
   }
 
-  const deepSvdd = source.deep_svdd && typeof source.deep_svdd === "object" ? source.deep_svdd : {};
-  const computedRadiusCandidate = Number(deepSvdd.radius ?? deepSvdd.boundary_radius ?? deepSvdd.boundaryRadius ?? NaN);
+  const deepSvdd =
+    source.deep_svdd && typeof source.deep_svdd === "object"
+      ? source.deep_svdd
+      : {};
+  const computedRadiusCandidate = Number(
+    deepSvdd.radius ??
+      deepSvdd.boundary_radius ??
+      deepSvdd.boundaryRadius ??
+      NaN,
+  );
   const currentPoint =
     points.find((point) => point.isCurrent) ||
     (source.current_point && typeof source.current_point === "object"
@@ -4852,26 +6182,45 @@ function normalizeLatentManifold(source) {
           ...source.current_point,
         }
       : points[points.length - 1]);
-  const currentDistanceFromBoundary = Number(deepSvdd.current_distance_from_boundary ?? deepSvdd.currentDistanceFromBoundary ?? NaN);
+  const currentDistanceFromBoundary = Number(
+    deepSvdd.current_distance_from_boundary ??
+      deepSvdd.currentDistanceFromBoundary ??
+      NaN,
+  );
 
   return {
-    projectionMethod: String(source.projection_method || source.projectionMethod || "pca"),
-    sourceModel: String(source.source_model || source.sourceModel || "vae_latent"),
+    projectionMethod: String(
+      source.projection_method || source.projectionMethod || "pca",
+    ),
+    sourceModel: String(
+      source.source_model || source.sourceModel || "vae_latent",
+    ),
     latentDim: Number(source.latent_dim ?? source.latentDim ?? 0),
     points,
     currentPoint,
     deepSvdd: {
-      radius: Number.isFinite(computedRadiusCandidate) ? computedRadiusCandidate : null,
-      boundaryCenter: safeArray(deepSvdd.boundary_center ?? deepSvdd.boundaryCenter)
+      radius: Number.isFinite(computedRadiusCandidate)
+        ? computedRadiusCandidate
+        : null,
+      boundaryCenter: safeArray(
+        deepSvdd.boundary_center ?? deepSvdd.boundaryCenter,
+      )
         .slice(0, 2)
         .map((value) => Number(value)),
       boundaryRadius: Number.isFinite(computedRadiusCandidate)
         ? computedRadiusCandidate
         : Number(deepSvdd.boundary_radius ?? deepSvdd.boundaryRadius ?? 0),
-      currentDistanceFromBoundary: Number.isFinite(currentDistanceFromBoundary) ? currentDistanceFromBoundary : 0,
-      approximation: String(deepSvdd.approximation || "Projected 2D boundary drawn from near-threshold Deep SVDD points."),
+      currentDistanceFromBoundary: Number.isFinite(currentDistanceFromBoundary)
+        ? currentDistanceFromBoundary
+        : 0,
+      approximation: String(
+        deepSvdd.approximation ||
+          "Projected 2D boundary drawn from near-threshold Deep SVDD points.",
+      ),
     },
-    pointCount: Number(source.point_count ?? source.pointCount ?? points.length),
+    pointCount: Number(
+      source.point_count ?? source.pointCount ?? points.length,
+    ),
   };
 }
 
@@ -4887,20 +6236,28 @@ function buildFallbackLatentManifold(models, activeModel, primaryModel) {
     return null;
   }
 
-  const latencies = ranked.map((model) => Number(model.latencyMs ?? 0)).filter(Number.isFinite);
-  const memories = ranked.map((model) => Number(model.memoryMb ?? 0)).filter(Number.isFinite);
+  const latencies = ranked
+    .map((model) => Number(model.latencyMs ?? 0))
+    .filter(Number.isFinite);
+  const memories = ranked
+    .map((model) => Number(model.memoryMb ?? 0))
+    .filter(Number.isFinite);
   const maxLatency = Math.max(...latencies, 1);
   const maxMemory = Math.max(...memories, 1);
-  const selectedKey = activeModel?.key || primaryModel?.key || ranked[0]?.key || null;
+  const selectedKey =
+    activeModel?.key || primaryModel?.key || ranked[0]?.key || null;
 
   const points = ranked.slice(0, 12).map((model, index) => {
     const familyBoost = model.family === "DL" ? 0.08 : -0.08;
     const scoreOffset = 0.5 - model.score;
     const angle = (index / Math.max(ranked.length, 1)) * Math.PI * 2;
     const radius = 0.16 + scoreOffset * 0.28;
-    const latencyBias = clamp01(Number(model.latencyMs ?? 0) / maxLatency) - 0.5;
+    const latencyBias =
+      clamp01(Number(model.latencyMs ?? 0) / maxLatency) - 0.5;
     const memoryBias = clamp01(Number(model.memoryMb ?? 0) / maxMemory) - 0.5;
-    const x = clamp01(0.5 + Math.cos(angle) * radius + familyBoost + latencyBias * 0.12);
+    const x = clamp01(
+      0.5 + Math.cos(angle) * radius + familyBoost + latencyBias * 0.12,
+    );
     const y = clamp01(0.5 + Math.sin(angle) * radius + memoryBias * 0.12);
 
     return {
@@ -4909,7 +6266,8 @@ function buildFallbackLatentManifold(models, activeModel, primaryModel) {
       x,
       y,
       anomalyScore: clamp01(1 - model.score),
-      deepSvddDistance: Number(model.latencyMs ?? 0) / 14 + Number(model.memoryMb ?? 0) / 220,
+      deepSvddDistance:
+        Number(model.latencyMs ?? 0) / 14 + Number(model.memoryMb ?? 0) / 220,
       isCurrent: model.key === selectedKey,
       isAnomalous: model.score < 0.85,
     };
@@ -4918,7 +6276,10 @@ function buildFallbackLatentManifold(models, activeModel, primaryModel) {
   const currentPoint = points.find((point) => point.isCurrent) || points[0];
   const boundaryCenter = [0.5, 0.5];
   const currentDistanceFromBoundary = currentPoint
-    ? Math.sqrt((currentPoint.x - boundaryCenter[0]) ** 2 + (currentPoint.y - boundaryCenter[1]) ** 2)
+    ? Math.sqrt(
+        (currentPoint.x - boundaryCenter[0]) ** 2 +
+          (currentPoint.y - boundaryCenter[1]) ** 2,
+      )
     : 0;
 
   return {
@@ -4932,7 +6293,8 @@ function buildFallbackLatentManifold(models, activeModel, primaryModel) {
       boundaryCenter,
       boundaryRadius: 0.28,
       currentDistanceFromBoundary,
-      approximation: "Fallback VAE projection built from the trained catalog when backend latents are unavailable.",
+      approximation:
+        "Fallback VAE projection built from the trained catalog when backend latents are unavailable.",
     },
     pointCount: points.length,
   };
@@ -4959,10 +6321,21 @@ function buildFallbackReconstructionResidualHeatmap(models, activeModel) {
     "Recall miss",
   ];
   const currentKey = activeModel?.key || ranked[0]?.key || null;
-  const maxAbsResidual = ranked.reduce((max, model) => Math.max(max, Number(model.latencyMs ?? 0), Number(model.memoryMb ?? 0), Number(model.accuracy ?? 0) * 100), 0);
+  const maxAbsResidual = ranked.reduce(
+    (max, model) =>
+      Math.max(
+        max,
+        Number(model.latencyMs ?? 0),
+        Number(model.memoryMb ?? 0),
+        Number(model.accuracy ?? 0) * 100,
+      ),
+    0,
+  );
 
   const modelsWithRows = ranked.slice(0, 6).map((model, index) => {
-    const score = clamp01(Number(model.f1 ?? model.score ?? model.accuracy ?? 0));
+    const score = clamp01(
+      Number(model.f1 ?? model.score ?? model.accuracy ?? 0),
+    );
     const latency = Number(model.latencyMs ?? 0);
     const memory = Number(model.memoryMb ?? 0);
     const accuracy = clamp01(Number(model.accuracy ?? model.score ?? 0));
@@ -4988,8 +6361,12 @@ function buildFallbackReconstructionResidualHeatmap(models, activeModel) {
     };
   });
 
-  const selectedRow = modelsWithRows.find((row) => row.modelKey === currentKey) || modelsWithRows[0];
-  const selectedFeatureIndex = selectedRow ? selectedRow.row.indexOf(Math.max(...selectedRow.row)) : 0;
+  const selectedRow =
+    modelsWithRows.find((row) => row.modelKey === currentKey) ||
+    modelsWithRows[0];
+  const selectedFeatureIndex = selectedRow
+    ? selectedRow.row.indexOf(Math.max(...selectedRow.row))
+    : 0;
 
   return {
     status: "ready",
@@ -5002,7 +6379,10 @@ function buildFallbackReconstructionResidualHeatmap(models, activeModel) {
     selectedCell: {
       rowIndex: selectedRow?.index ?? 0,
       featureIndex: selectedFeatureIndex >= 0 ? selectedFeatureIndex : 0,
-      value: selectedRow?.row?.[selectedFeatureIndex >= 0 ? selectedFeatureIndex : 0] ?? 0,
+      value:
+        selectedRow?.row?.[
+          selectedFeatureIndex >= 0 ? selectedFeatureIndex : 0
+        ] ?? 0,
     },
   };
 }
@@ -5020,11 +6400,17 @@ function normalizeReconstructionResidualHeatmap(source) {
       index,
       model: String(row.model ?? row.name ?? `Model ${index + 1}`),
       modelKey: String(row.model_key ?? row.modelKey ?? `model-${index + 1}`),
-      meanAbsResidual: Number(row.mean_abs_residual ?? row.meanAbsResidual ?? 0),
+      meanAbsResidual: Number(
+        row.mean_abs_residual ?? row.meanAbsResidual ?? 0,
+      ),
       maxAbsResidual: Number(row.max_abs_residual ?? row.maxAbsResidual ?? 0),
       topFeature: String(row.top_feature ?? row.topFeature ?? ""),
-      topFeatureResidual: Number(row.top_feature_residual ?? row.topFeatureResidual ?? 0),
-      row: safeArray(row.heatmap_row ?? row.row ?? []).map((value) => Number(value ?? 0)),
+      topFeatureResidual: Number(
+        row.top_feature_residual ?? row.topFeatureResidual ?? 0,
+      ),
+      row: safeArray(row.heatmap_row ?? row.row ?? []).map((value) =>
+        Number(value ?? 0),
+      ),
     }))
     .filter((row) => row.row.length > 0);
 
@@ -5032,14 +6418,19 @@ function normalizeReconstructionResidualHeatmap(source) {
     return null;
   }
 
-  const trimmedSize = Math.min(featureNames.length, ...rows.map((row) => row.row.length));
+  const trimmedSize = Math.min(
+    featureNames.length,
+    ...rows.map((row) => row.row.length),
+  );
   if (!trimmedSize) {
     return null;
   }
 
   const matrix = rows.map((row) => row.row.slice(0, trimmedSize));
   const trimmedFeatures = featureNames.slice(0, trimmedSize);
-  const maxAbsResidual = Number(source.max_abs_residual ?? source.maxAbsResidual ?? 0);
+  const maxAbsResidual = Number(
+    source.max_abs_residual ?? source.maxAbsResidual ?? 0,
+  );
   const fallbackMax = Math.max(maxAbsResidual, ...matrix.flat(), 0);
   const peakCell = matrix.reduce(
     (best, row, rowIndex) =>
@@ -5060,8 +6451,17 @@ function normalizeReconstructionResidualHeatmap(source) {
       row: matrix[index],
     })),
     matrix,
-    currentRecordLabel: String(source.current_record_label ?? source.currentRecordLabel ?? "current-record"),
-    highlightFeature: String(source.highlight_feature ?? source.highlightFeature ?? trimmedFeatures[peakCell.featureIndex] ?? ""),
+    currentRecordLabel: String(
+      source.current_record_label ??
+        source.currentRecordLabel ??
+        "current-record",
+    ),
+    highlightFeature: String(
+      source.highlight_feature ??
+        source.highlightFeature ??
+        trimmedFeatures[peakCell.featureIndex] ??
+        "",
+    ),
     maxAbsResidual: Number.isFinite(fallbackMax) ? fallbackMax : 0,
     selectedCell: {
       rowIndex: peakCell.rowIndex,
@@ -5076,19 +6476,27 @@ function scoreToColor(score) {
   const start = [98, 212, 255];
   const mid = [156, 241, 210];
   const end = [255, 127, 150];
-  const blend = (a, b, ratio) => a.map((value, index) => Math.round(value + (b[index] - value) * ratio));
-  const rgb = t < 0.5 ? blend(start, mid, t * 2) : blend(mid, end, (t - 0.5) * 2);
+  const blend = (a, b, ratio) =>
+    a.map((value, index) => Math.round(value + (b[index] - value) * ratio));
+  const rgb =
+    t < 0.5 ? blend(start, mid, t * 2) : blend(mid, end, (t - 0.5) * 2);
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
 
 function residualMagnitudeColor(value, maxValue) {
   const safeMax = Number.isFinite(maxValue) && maxValue > 0 ? maxValue : 1;
-  const ratio = clamp01(Math.log1p(Math.max(0, Number(value) || 0)) / Math.log1p(safeMax));
+  const ratio = clamp01(
+    Math.log1p(Math.max(0, Number(value) || 0)) / Math.log1p(safeMax),
+  );
   const start = [44, 73, 102];
   const mid = [78, 165, 216];
   const end = [243, 156, 18];
-  const blend = (a, b, amount) => a.map((entry, index) => Math.round(entry + (b[index] - entry) * amount));
-  const rgb = ratio < 0.6 ? blend(start, mid, ratio / 0.6) : blend(mid, end, (ratio - 0.6) / 0.4);
+  const blend = (a, b, amount) =>
+    a.map((entry, index) => Math.round(entry + (b[index] - entry) * amount));
+  const rgb =
+    ratio < 0.6
+      ? blend(start, mid, ratio / 0.6)
+      : blend(mid, end, (ratio - 0.6) / 0.4);
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${0.24 + ratio * 0.52})`;
 }
 
@@ -5107,11 +6515,15 @@ function isValidNumber(value) {
 }
 
 function PatientDetailsPage() {
-  const { patient, updateSection, markStepComplete, markStepIncomplete } = usePatient();
+  const { patient, updateSection, markStepComplete, markStepIncomplete } =
+    usePatient();
   const step = flowSteps[0];
   const weight = Number(patient.measurements.weight);
   const heightMeters = Number(patient.measurements.height) / 100;
-  const bmi = weight > 0 && heightMeters > 0 ? (weight / (heightMeters * heightMeters)).toFixed(2) : "0.00";
+  const bmi =
+    weight > 0 && heightMeters > 0
+      ? (weight / (heightMeters * heightMeters)).toFixed(2)
+      : "0.00";
   const [referenceOpen, setReferenceOpen] = React.useState(false);
   const selectedComorbidities = React.useMemo(
     () =>
@@ -5123,20 +6535,61 @@ function PatientDetailsPage() {
   );
   const requiredIntakeFields = React.useMemo(
     () => [
-      { label: "Age", value: patient.demographics.age, valid: isValidPositiveNumber(patient.demographics.age) },
-      { label: "Symptom duration", value: patient.visit.symptomOnset, valid: isPresent(patient.visit.symptomOnset) },
-      { label: "Comorbidities", value: patient.medicalHistory.comorbidities, valid: isPresent(patient.medicalHistory.comorbidities) },
-      { label: "Heart rate", value: patient.measurements.heartRate, valid: isValidPositiveNumber(patient.measurements.heartRate) },
+      {
+        label: "Age",
+        value: patient.demographics.age,
+        valid: isValidPositiveNumber(patient.demographics.age),
+      },
+      {
+        label: "Symptom duration",
+        value: patient.visit.symptomOnset,
+        valid: isPresent(patient.visit.symptomOnset),
+      },
+      {
+        label: "Comorbidities",
+        value: patient.medicalHistory.comorbidities,
+        valid: isPresent(patient.medicalHistory.comorbidities),
+      },
+      {
+        label: "Heart rate",
+        value: patient.measurements.heartRate,
+        valid: isValidPositiveNumber(patient.measurements.heartRate),
+      },
       {
         label: "Blood pressure",
-        value: patient.measurements.systolicBp && patient.measurements.diastolicBp ? `${patient.measurements.systolicBp}/${patient.measurements.diastolicBp}` : "",
-        valid: isValidPositiveNumber(patient.measurements.systolicBp) && isValidPositiveNumber(patient.measurements.diastolicBp),
+        value:
+          patient.measurements.systolicBp && patient.measurements.diastolicBp
+            ? `${patient.measurements.systolicBp}/${patient.measurements.diastolicBp}`
+            : "",
+        valid:
+          isValidPositiveNumber(patient.measurements.systolicBp) &&
+          isValidPositiveNumber(patient.measurements.diastolicBp),
       },
-      { label: "SpO2", value: patient.measurements.spo2, valid: isValidPositiveNumber(patient.measurements.spo2) },
-      { label: "Body temperature", value: patient.measurements.temperature, valid: isValidPositiveNumber(patient.measurements.temperature) },
-      { label: "Respiratory rate", value: patient.measurements.respiratoryRate, valid: isValidPositiveNumber(patient.measurements.respiratoryRate) },
-      { label: "Hemoglobin", value: patient.labs.hemoglobin, valid: isValidPositiveNumber(patient.labs.hemoglobin) },
-      { label: "Blood glucose", value: patient.labs.bloodGlucose, valid: isValidPositiveNumber(patient.labs.bloodGlucose) },
+      {
+        label: "SpO2",
+        value: patient.measurements.spo2,
+        valid: isValidPositiveNumber(patient.measurements.spo2),
+      },
+      {
+        label: "Body temperature",
+        value: patient.measurements.temperature,
+        valid: isValidPositiveNumber(patient.measurements.temperature),
+      },
+      {
+        label: "Respiratory rate",
+        value: patient.measurements.respiratoryRate,
+        valid: isValidPositiveNumber(patient.measurements.respiratoryRate),
+      },
+      {
+        label: "Hemoglobin",
+        value: patient.labs.hemoglobin,
+        valid: isValidPositiveNumber(patient.labs.hemoglobin),
+      },
+      {
+        label: "Blood glucose",
+        value: patient.labs.bloodGlucose,
+        valid: isValidPositiveNumber(patient.labs.bloodGlucose),
+      },
     ],
     [
       patient.demographics.age,
@@ -5152,10 +6605,14 @@ function PatientDetailsPage() {
       patient.visit.symptomOnset,
     ],
   );
-  const missingRequiredFields = requiredIntakeFields.filter((field) => !field.valid);
+  const missingRequiredFields = requiredIntakeFields.filter(
+    (field) => !field.valid,
+  );
   const intakeReady = missingRequiredFields.length === 0;
   const completionPercentage = Math.round(
-    ((requiredIntakeFields.length - missingRequiredFields.length) / requiredIntakeFields.length) * 100,
+    ((requiredIntakeFields.length - missingRequiredFields.length) /
+      requiredIntakeFields.length) *
+      100,
   );
 
   React.useEffect(() => {
@@ -5200,7 +6657,12 @@ function PatientDetailsPage() {
   }, [intakeReady, markStepComplete, markStepIncomplete, step.slug]);
 
   const handleNext = React.useCallback(
-    async ({ navigate, nextStep, stepSlug, markStepComplete: completeStep }) => {
+    async ({
+      navigate,
+      nextStep,
+      stepSlug,
+      markStepComplete: completeStep,
+    }) => {
       if (!intakeReady || !nextStep) {
         return;
       }
@@ -5264,23 +6726,32 @@ function PatientDetailsPage() {
       </button>
 
       {referenceOpen ? (
-        <div className="reference-overlay" role="dialog" aria-modal="true" aria-label="Supporting context overlay">
+        <div
+          className="reference-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Supporting context overlay"
+        >
           <button
             type="button"
             className="reference-overlay__backdrop"
             aria-label="Close supporting context"
             onClick={() => setReferenceOpen(false)}
           />
-          <div
-            className="reference-overlay__panel"
-          >
+          <div className="reference-overlay__panel">
             <div className="reference-overlay__head">
               <div>
                 <p className="eyebrow">Reference area</p>
                 <h3>Mandatory Fields</h3>
-                <p className="reference-overlay__subtitle">Completion value: {completionPercentage}%</p>
+                <p className="reference-overlay__subtitle">
+                  Completion value: {completionPercentage}%
+                </p>
               </div>
-              <button type="button" className="button button--ghost" onClick={() => setReferenceOpen(false)}>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={() => setReferenceOpen(false)}
+              >
                 Close
               </button>
             </div>
@@ -5298,330 +6769,478 @@ function PatientDetailsPage() {
         onNext={handleNext}
         left={
           <div className="section-stack decision-support-main">
-          <SectionCard
-            eyebrow="Profile"
-            title="Patient profile"
-            description="Basic details can be added if helpful, but the required clinical inputs are what unlock the next step."
-          >
-            <TwoColumnFields>
-              <label>
-                <span>Patient ID</span>
-                <input
-                  value={patient.demographics.patientId}
-                  onChange={(e) => updateSection("demographics", { patientId: e.target.value })}
-                  placeholder="Type the patient ID"
-                />
-              </label>
-              <label>
-                <span>Full name</span>
-                <input
-                  value={patient.demographics.fullName}
-                  onChange={(e) => updateSection("demographics", { fullName: e.target.value })}
-                  placeholder="Type the person's name"
-                />
-              </label>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Age</span>
-                <input
-                  type="number"
-                  value={patient.demographics.age}
-                  onChange={(e) => updateSection("demographics", { age: e.target.value })}
-                  placeholder="Type age in years"
-                  required
-                />
-                {renderFieldHelp("years", "Enter the recorded patient age from the file or note.")}
-              </label>
-              <label>
-                <span>Sex</span>
-                <select value={patient.demographics.sex} onChange={(e) => updateSection("demographics", { sex: e.target.value })}>
-                  <option>Female</option>
-                  <option>Male</option>
-                  <option>Other</option>
-                </select>
-              </label>
-              <label>
-                <span>Location type</span>
-                <select
-                  value={patient.demographics.locationType}
-                  onChange={(e) => updateSection("demographics", { locationType: e.target.value })}
-                >
-                  <option>Clinic</option>
-                  <option>Home visit</option>
-                  <option>Community outreach</option>
-                  <option>Referral center</option>
-                </select>
-              </label>
-            </TwoColumnFields>
-          </SectionCard>
-
-          <SectionCard
-            eyebrow="Clinical visit"
-            title="Visit summary"
-            description="Capture the symptom timing and the context of the encounter."
-          >
-            <div className="form-grid">
-              <label>
-                <span>Chief complaint</span>
-                <textarea
-                  rows="4"
-                  value={patient.visit.chiefComplaint}
-                  onChange={(e) => updateSection("visit", { chiefComplaint: e.target.value })}
-                  placeholder="Tell us what is bothering the patient."
-                />
-              </label>
+            <SectionCard
+              eyebrow="Profile"
+              title="Patient profile"
+              description="Basic details can be added if helpful, but the required clinical inputs are what unlock the next step."
+            >
               <TwoColumnFields>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Symptom duration</span>
-                <input
-                  value={patient.visit.symptomOnset}
-                  onChange={(e) => updateSection("visit", { symptomOnset: e.target.value })}
-                  placeholder="How long has it been going on?"
-                  required
-                />
-                {renderFieldHelp("time", "Capture the symptom duration using the encounter notes.")}
-              </label>
                 <label>
-                  <span>Visit date</span>
+                  <span>Patient ID</span>
                   <input
-                    type="date"
-                    value={patient.visit.visitDate}
-                    onChange={(e) => updateSection("visit", { visitDate: e.target.value })}
+                    value={patient.demographics.patientId}
+                    onChange={(e) =>
+                      updateSection("demographics", {
+                        patientId: e.target.value,
+                      })
+                    }
+                    placeholder="Type the patient ID"
                   />
                 </label>
                 <label>
-                  <span>Triage priority</span>
-                  <select value={patient.visit.triagePriority} onChange={(e) => updateSection("visit", { triagePriority: e.target.value })}>
-                    <option>Routine</option>
-                    <option>Urgent</option>
-                    <option>Emergency</option>
+                  <span>Full name</span>
+                  <input
+                    value={patient.demographics.fullName}
+                    onChange={(e) =>
+                      updateSection("demographics", {
+                        fullName: e.target.value,
+                      })
+                    }
+                    placeholder="Type the person's name"
+                  />
+                </label>
+                <label>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>Age</span>
+                  <input
+                    type="number"
+                    value={patient.demographics.age}
+                    onChange={(e) =>
+                      updateSection("demographics", { age: e.target.value })
+                    }
+                    placeholder="Type age in years"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "years",
+                    "Enter the recorded patient age from the file or note.",
+                  )}
+                </label>
+                <label>
+                  <span>Sex</span>
+                  <select
+                    value={patient.demographics.sex}
+                    onChange={(e) =>
+                      updateSection("demographics", { sex: e.target.value })
+                    }
+                  >
+                    <option>Female</option>
+                    <option>Male</option>
+                    <option>Other</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Location type</span>
+                  <select
+                    value={patient.demographics.locationType}
+                    onChange={(e) =>
+                      updateSection("demographics", {
+                        locationType: e.target.value,
+                      })
+                    }
+                  >
+                    <option>Clinic</option>
+                    <option>Home visit</option>
+                    <option>Community outreach</option>
+                    <option>Referral center</option>
                   </select>
                 </label>
               </TwoColumnFields>
-            </div>
-          </SectionCard>
+            </SectionCard>
 
-          <SectionCard
-            eyebrow="Medical history"
-            title="Medications and chronic conditions"
-            description="Long-term conditions and current therapy stay visible for later decision support."
-          >
-            <div className="form-grid">
-              <div className="patient-field-set">
-                <div className="patient-field-set__head">
-                  <span className="field-badge field-badge--required">Mandatory</span>
-                  <span>Comorbidities</span>
-                </div>
-                <div className="patient-field-set__options">
-                  {comorbidityOptions.map((option) => {
-                    const checked = selectedComorbidities.includes(option);
-                    return (
-                      <label key={option} className={`patient-option${checked ? " patient-option--selected" : ""}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleComorbidity(option)}
-                        />
-                        <span>{option}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                {selectedComorbidities.length ? (
-                  <div className="patient-field-set__summary">
-                    {selectedComorbidities.map((value) => (
-                      <span key={value} className="patient-chip">
-                        {value}
-                      </span>
-                    ))}
+            <SectionCard
+              eyebrow="Clinical visit"
+              title="Visit summary"
+              description="Capture the symptom timing and the context of the encounter."
+            >
+              <div className="form-grid">
+                <label>
+                  <span>Chief complaint</span>
+                  <textarea
+                    rows="4"
+                    value={patient.visit.chiefComplaint}
+                    onChange={(e) =>
+                      updateSection("visit", { chiefComplaint: e.target.value })
+                    }
+                    placeholder="Tell us what is bothering the patient."
+                  />
+                </label>
+                <TwoColumnFields>
+                  <label>
+                    <span className="field-badge field-badge--required">
+                      Mandatory
+                    </span>
+                    <span>Symptom duration</span>
+                    <input
+                      value={patient.visit.symptomOnset}
+                      onChange={(e) =>
+                        updateSection("visit", { symptomOnset: e.target.value })
+                      }
+                      placeholder="How long has it been going on?"
+                      required
+                    />
+                    {renderFieldHelp(
+                      "time",
+                      "Capture the symptom duration using the encounter notes.",
+                    )}
+                  </label>
+                  <label>
+                    <span>Visit date</span>
+                    <input
+                      type="date"
+                      value={patient.visit.visitDate}
+                      onChange={(e) =>
+                        updateSection("visit", { visitDate: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>Triage priority</span>
+                    <select
+                      value={patient.visit.triagePriority}
+                      onChange={(e) =>
+                        updateSection("visit", {
+                          triagePriority: e.target.value,
+                        })
+                      }
+                    >
+                      <option>Routine</option>
+                      <option>Urgent</option>
+                      <option>Emergency</option>
+                    </select>
+                  </label>
+                </TwoColumnFields>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              eyebrow="Medical history"
+              title="Medications and chronic conditions"
+              description="Long-term conditions and current therapy stay visible for later decision support."
+            >
+              <div className="form-grid">
+                <div className="patient-field-set">
+                  <div className="patient-field-set__head">
+                    <span className="field-badge field-badge--required">
+                      Mandatory
+                    </span>
+                    <span>Comorbidities</span>
                   </div>
-                ) : null}
-                {renderFieldHelp("multi-select", "Tick every chronic condition that applies to this patient.")}
+                  <div className="patient-field-set__options">
+                    {comorbidityOptions.map((option) => {
+                      const checked = selectedComorbidities.includes(option);
+                      return (
+                        <label
+                          key={option}
+                          className={`patient-option${checked ? " patient-option--selected" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleComorbidity(option)}
+                          />
+                          <span>{option}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {selectedComorbidities.length ? (
+                    <div className="patient-field-set__summary">
+                      {selectedComorbidities.map((value) => (
+                        <span key={value} className="patient-chip">
+                          {value}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {renderFieldHelp(
+                    "multi-select",
+                    "Tick every chronic condition that applies to this patient.",
+                  )}
+                </div>
+                <TwoColumnFields>
+                  <label>
+                    <span>Current medications</span>
+                    <input
+                      value={patient.medicalHistory.currentMedications}
+                      onChange={(e) =>
+                        updateSection("medicalHistory", {
+                          currentMedications: e.target.value,
+                        })
+                      }
+                      placeholder="List current medicines"
+                    />
+                  </label>
+                  <label>
+                    <span>Allergies</span>
+                    <input
+                      value={patient.medicalHistory.allergies}
+                      onChange={(e) =>
+                        updateSection("medicalHistory", {
+                          allergies: e.target.value,
+                        })
+                      }
+                      placeholder="Type any allergies"
+                    />
+                  </label>
+                  <label>
+                    <span>Family history</span>
+                    <input
+                      value={patient.medicalHistory.familyHistory}
+                      onChange={(e) =>
+                        updateSection("medicalHistory", {
+                          familyHistory: e.target.value,
+                        })
+                      }
+                      placeholder="Any similar health issues in the family"
+                    />
+                  </label>
+                  <label>
+                    <span>Social history</span>
+                    <input
+                      value={patient.medicalHistory.socialHistory}
+                      onChange={(e) =>
+                        updateSection("medicalHistory", {
+                          socialHistory: e.target.value,
+                        })
+                      }
+                      placeholder="Smoking, alcohol, work, or exercise"
+                    />
+                  </label>
+                </TwoColumnFields>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              eyebrow="Clinical measurements"
+              title="Vitals and anthropometrics"
+              description="Measure the patient now. BMI is calculated from weight and height."
+            >
+              <div className="measurement-summary">
+                <NumberSummary label="BMI" value={bmi} suffix="" />
+                <NumberSummary
+                  label="Weight"
+                  value={patient.measurements.weight || "—"}
+                  suffix=" kg"
+                />
+                <NumberSummary
+                  label="Height"
+                  value={patient.measurements.height || "—"}
+                  suffix=" cm"
+                />
               </div>
               <TwoColumnFields>
                 <label>
-                  <span>Current medications</span>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>Heart rate</span>
                   <input
-                    value={patient.medicalHistory.currentMedications}
-                    onChange={(e) => updateSection("medicalHistory", { currentMedications: e.target.value })}
-                    placeholder="List current medicines"
+                    type="number"
+                    value={patient.measurements.heartRate}
+                    onChange={(e) =>
+                      updateSection("measurements", {
+                        heartRate: e.target.value,
+                      })
+                    }
+                    placeholder="Type the pulse"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "bpm",
+                    "Enter the latest measured pulse from the vitals check.",
+                  )}
+                </label>
+                <label>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>Systolic BP</span>
+                  <input
+                    type="number"
+                    value={patient.measurements.systolicBp}
+                    onChange={(e) =>
+                      updateSection("measurements", {
+                        systolicBp: e.target.value,
+                      })
+                    }
+                    placeholder="Top blood pressure number"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "mmHg",
+                    "Use the upper blood pressure number from the reading.",
+                  )}
+                </label>
+                <label>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>Diastolic BP</span>
+                  <input
+                    type="number"
+                    value={patient.measurements.diastolicBp}
+                    onChange={(e) =>
+                      updateSection("measurements", {
+                        diastolicBp: e.target.value,
+                      })
+                    }
+                    placeholder="Bottom blood pressure number"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "mmHg",
+                    "Use the lower blood pressure number from the reading.",
+                  )}
+                </label>
+                <label>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>SpO2</span>
+                  <input
+                    type="number"
+                    value={patient.measurements.spo2}
+                    onChange={(e) =>
+                      updateSection("measurements", { spo2: e.target.value })
+                    }
+                    placeholder="Type oxygen level"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "%",
+                    "Use the most recent oxygen saturation value.",
+                  )}
+                </label>
+                <label>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>Body temperature</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={patient.measurements.temperature}
+                    onChange={(e) =>
+                      updateSection("measurements", {
+                        temperature: e.target.value,
+                      })
+                    }
+                    placeholder="Body temperature"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "°C",
+                    "Enter the current temperature measurement.",
+                  )}
+                </label>
+                <label>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>Respiratory rate</span>
+                  <input
+                    type="number"
+                    value={patient.measurements.respiratoryRate}
+                    onChange={(e) =>
+                      updateSection("measurements", {
+                        respiratoryRate: e.target.value,
+                      })
+                    }
+                    placeholder="Breaths per minute"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "breaths/min",
+                    "Use the latest breathing rate from the chart or note.",
+                  )}
+                </label>
+                <label>
+                  <span>Weight (kg)</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={patient.measurements.weight}
+                    onChange={(e) =>
+                      updateSection("measurements", { weight: e.target.value })
+                    }
+                    placeholder="Type weight in kg"
                   />
                 </label>
                 <label>
-                  <span>Allergies</span>
+                  <span>Height (cm)</span>
                   <input
-                    value={patient.medicalHistory.allergies}
-                    onChange={(e) => updateSection("medicalHistory", { allergies: e.target.value })}
-                    placeholder="Type any allergies"
-                  />
-                </label>
-                <label>
-                  <span>Family history</span>
-                  <input
-                    value={patient.medicalHistory.familyHistory}
-                    onChange={(e) => updateSection("medicalHistory", { familyHistory: e.target.value })}
-                    placeholder="Any similar health issues in the family"
-                  />
-                </label>
-                <label>
-                  <span>Social history</span>
-                  <input
-                    value={patient.medicalHistory.socialHistory}
-                    onChange={(e) => updateSection("medicalHistory", { socialHistory: e.target.value })}
-                    placeholder="Smoking, alcohol, work, or exercise"
+                    type="number"
+                    step="0.1"
+                    value={patient.measurements.height}
+                    onChange={(e) =>
+                      updateSection("measurements", { height: e.target.value })
+                    }
+                    placeholder="Type height in cm"
                   />
                 </label>
               </TwoColumnFields>
-            </div>
-          </SectionCard>
+            </SectionCard>
 
-          <SectionCard
-            eyebrow="Clinical measurements"
-            title="Vitals and anthropometrics"
-            description="Measure the patient now. BMI is calculated from weight and height."
-          >
-            <div className="measurement-summary">
-              <NumberSummary label="BMI" value={bmi} suffix="" />
-              <NumberSummary label="Weight" value={patient.measurements.weight || "—"} suffix=" kg" />
-              <NumberSummary label="Height" value={patient.measurements.height || "—"} suffix=" cm" />
+            <SectionCard
+              eyebrow="Point-of-care labs"
+              title="Mandatory bedside labs"
+              description="These lab values are required on Step 1 so the intake stays complete."
+            >
+              <TwoColumnFields>
+                <label>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>Hemoglobin</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={patient.labs.hemoglobin}
+                    onChange={(e) =>
+                      updateSection("labs", { hemoglobin: e.target.value })
+                    }
+                    placeholder="Type hemoglobin"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "g/dL",
+                    "Use the reported hemoglobin value from the lab note.",
+                  )}
+                </label>
+                <label>
+                  <span className="field-badge field-badge--required">
+                    Mandatory
+                  </span>
+                  <span>Blood Glucose</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={patient.labs.bloodGlucose}
+                    onChange={(e) =>
+                      updateSection("labs", { bloodGlucose: e.target.value })
+                    }
+                    placeholder="Type blood glucose"
+                    required
+                  />
+                  {renderFieldHelp(
+                    "mg/dL",
+                    "Use the glucose value shown in the record.",
+                  )}
+                </label>
+              </TwoColumnFields>
+            </SectionCard>
+            <div className="back-to-top-wrap">
+              <button
+                type="button"
+                className="button button--ghost back-to-top-button"
+                onClick={handleBackToTop}
+              >
+                Back to Top
+              </button>
             </div>
-            <TwoColumnFields>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Heart rate</span>
-                <input
-                  type="number"
-                  value={patient.measurements.heartRate}
-                  onChange={(e) => updateSection("measurements", { heartRate: e.target.value })}
-                  placeholder="Type the pulse"
-                  required
-                />
-                {renderFieldHelp("bpm", "Enter the latest measured pulse from the vitals check.")}
-              </label>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Systolic BP</span>
-                <input
-                  type="number"
-                  value={patient.measurements.systolicBp}
-                  onChange={(e) => updateSection("measurements", { systolicBp: e.target.value })}
-                  placeholder="Top blood pressure number"
-                  required
-                />
-                {renderFieldHelp("mmHg", "Use the upper blood pressure number from the reading.")}
-              </label>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Diastolic BP</span>
-                <input
-                  type="number"
-                  value={patient.measurements.diastolicBp}
-                  onChange={(e) => updateSection("measurements", { diastolicBp: e.target.value })}
-                  placeholder="Bottom blood pressure number"
-                  required
-                />
-                {renderFieldHelp("mmHg", "Use the lower blood pressure number from the reading.")}
-              </label>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>SpO2</span>
-                <input
-                  type="number"
-                  value={patient.measurements.spo2}
-                  onChange={(e) => updateSection("measurements", { spo2: e.target.value })}
-                  placeholder="Type oxygen level"
-                  required
-                />
-                {renderFieldHelp("%", "Use the most recent oxygen saturation value.")}
-              </label>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Body temperature</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={patient.measurements.temperature}
-                  onChange={(e) => updateSection("measurements", { temperature: e.target.value })}
-                  placeholder="Body temperature"
-                  required
-                />
-                {renderFieldHelp("°C", "Enter the current temperature measurement.")}
-              </label>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Respiratory rate</span>
-                <input
-                  type="number"
-                  value={patient.measurements.respiratoryRate}
-                  onChange={(e) => updateSection("measurements", { respiratoryRate: e.target.value })}
-                  placeholder="Breaths per minute"
-                  required
-                />
-                {renderFieldHelp("breaths/min", "Use the latest breathing rate from the chart or note.")}
-              </label>
-              <label>
-                <span>Weight (kg)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={patient.measurements.weight}
-                  onChange={(e) => updateSection("measurements", { weight: e.target.value })}
-                  placeholder="Type weight in kg"
-                />
-              </label>
-              <label>
-                <span>Height (cm)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={patient.measurements.height}
-                  onChange={(e) => updateSection("measurements", { height: e.target.value })}
-                  placeholder="Type height in cm"
-                />
-              </label>
-            </TwoColumnFields>
-          </SectionCard>
-
-          <SectionCard
-            eyebrow="Point-of-care labs"
-            title="Mandatory bedside labs"
-            description="These lab values are required on Step 1 so the intake stays complete."
-          >
-            <TwoColumnFields>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Hemoglobin</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={patient.labs.hemoglobin}
-                  onChange={(e) => updateSection("labs", { hemoglobin: e.target.value })}
-                  placeholder="Type hemoglobin"
-                  required
-                />
-                {renderFieldHelp("g/dL", "Use the reported hemoglobin value from the lab note.")}
-              </label>
-              <label>
-                <span className="field-badge field-badge--required">Mandatory</span>
-                <span>Blood Glucose</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={patient.labs.bloodGlucose}
-                  onChange={(e) => updateSection("labs", { bloodGlucose: e.target.value })}
-                  placeholder="Type blood glucose"
-                  required
-                />
-                {renderFieldHelp("mg/dL", "Use the glucose value shown in the record.")}
-              </label>
-            </TwoColumnFields>
-          </SectionCard>
-          <div className="back-to-top-wrap">
-            <button type="button" className="button button--ghost back-to-top-button" onClick={handleBackToTop}>
-              Back to Top
-            </button>
-          </div>
           </div>
         }
         right={null}
@@ -5706,7 +7325,9 @@ function LabInvestigationPage() {
         return;
       }
 
-      const sourceLabel = file.name.toLowerCase().endsWith(".pdf") ? "PDF report" : "CSV report";
+      const sourceLabel = file.name.toLowerCase().endsWith(".pdf")
+        ? "PDF report"
+        : "CSV report";
       setUploadState({
         status: "parsing",
         message: `Parsing ${sourceLabel}...`,
@@ -5736,7 +7357,8 @@ function LabInvestigationPage() {
         if (!valid) {
           setUploadState({
             status: "error",
-            message: "Please complete all required lab fields before continuing.",
+            message:
+              "Please complete all required lab fields before continuing.",
           });
         }
         return;
@@ -5756,9 +7378,19 @@ function LabInvestigationPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const missingFields = labFieldSpecs.filter((field) => !watchedLabs?.[field.key]).length;
+  const missingFields = labFieldSpecs.filter(
+    (field) => !watchedLabs?.[field.key],
+  ).length;
   const totalFields = labFieldSpecs.length;
-  const completionPercentage = Math.max(0, Math.min(100, Math.round(((totalFields - missingFields) / Math.max(totalFields, 1)) * 100)));
+  const completionPercentage = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        ((totalFields - missingFields) / Math.max(totalFields, 1)) * 100,
+      ),
+    ),
+  );
   const referenceAreaProps = {
     missingFields,
     isValid,
@@ -5768,7 +7400,11 @@ function LabInvestigationPage() {
 
   return (
     <>
-      <button type="button" className="reference-float-button" onClick={() => setReferenceOpen(true)}>
+      <button
+        type="button"
+        className="reference-float-button"
+        onClick={() => setReferenceOpen(true)}
+      >
         <CompletionRing value={completionPercentage} />
         <span className="reference-float-button__copy">
           <strong>Lab Status</strong>
@@ -5781,7 +7417,12 @@ function LabInvestigationPage() {
       </button>
 
       {referenceOpen ? (
-        <div className="reference-overlay" role="dialog" aria-modal="true" aria-label="Supporting context overlay">
+        <div
+          className="reference-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Supporting context overlay"
+        >
           <button
             type="button"
             className="reference-overlay__backdrop"
@@ -5793,9 +7434,15 @@ function LabInvestigationPage() {
               <div>
                 <p className="eyebrow">Reference area</p>
                 <h3>Supporting context</h3>
-                <p className="reference-overlay__subtitle">Completion value: {completionPercentage}%</p>
+                <p className="reference-overlay__subtitle">
+                  Completion value: {completionPercentage}%
+                </p>
               </div>
-              <button type="button" className="button button--ghost" onClick={() => setReferenceOpen(false)}>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={() => setReferenceOpen(false)}
+              >
                 Close
               </button>
             </div>
@@ -5809,7 +7456,9 @@ function LabInvestigationPage() {
       <StepSkeleton
         step={step}
         gridClassName="step-shell-grid--lab"
-        nextDisabled={!isValid || isSubmitting || uploadState.status === "parsing"}
+        nextDisabled={
+          !isValid || isSubmitting || uploadState.status === "parsing"
+        }
         nextLabel="Continue to Patient Care Insights"
         onNext={handleNext}
         right={null}
@@ -5822,10 +7471,16 @@ function LabInvestigationPage() {
             >
               <div className="upload-zone">
                 <label className="upload-button">
-                  <input type="file" accept=".pdf,.csv" onChange={handleUpload} />
+                  <input
+                    type="file"
+                    accept=".pdf,.csv"
+                    onChange={handleUpload}
+                  />
                   <span>Choose PDF or CSV</span>
                 </label>
-                <div className={`upload-status upload-status--${uploadState.status}`}>
+                <div
+                  className={`upload-status upload-status--${uploadState.status}`}
+                >
                   {uploadState.message}
                 </div>
               </div>
@@ -5864,7 +7519,11 @@ function LabInvestigationPage() {
       />
 
       <div className="back-to-top-wrap">
-        <button type="button" className="button button--ghost back-to-top-button" onClick={handleBackToTop}>
+        <button
+          type="button"
+          className="button button--ghost back-to-top-button"
+          onClick={handleBackToTop}
+        >
           Back to top
         </button>
       </div>
@@ -5875,13 +7534,20 @@ function LabInvestigationPage() {
 function PatientCareInsightsPage() {
   const { patient } = usePatient();
   const step = flowSteps[2];
-  const careInsights = React.useMemo(() => buildSafePatientCareInsights(patient), [patient]);
+  const careInsights = React.useMemo(
+    () => buildSafePatientCareInsights(patient),
+    [patient],
+  );
 
   return (
     <StepLayout step={step}>
       <div className="care-insights-dashboard care-insights-dashboard--compact">
         <div className="care-insights-card-grid">
-          <AnomalyGaugeCard score={careInsights.totalSeverity} riskLevel={careInsights.riskLevel} totalCount={careInsights.anomalies.length} />
+          <AnomalyGaugeCard
+            score={careInsights.totalSeverity}
+            riskLevel={careInsights.riskLevel}
+            totalCount={careInsights.anomalies.length}
+          />
           <GraphPanel
             title="Anomaly level by area"
             subtitle="Higher bars mean more attention is needed in that area."
@@ -5890,31 +7556,46 @@ function PatientCareInsightsPage() {
             valueLabel="Severity"
           />
           <RadarChart metrics={careInsights.radarMetrics} />
-          <AnomalyTrendChart series={careInsights.trendSeries} score={careInsights.totalSeverity} riskLevel={careInsights.riskLevel} />
+          <AnomalyTrendChart
+            series={careInsights.trendSeries}
+            score={careInsights.totalSeverity}
+            riskLevel={careInsights.riskLevel}
+          />
           <HeatmapGrid cells={careInsights.heatmapCells} />
           <AnomalyPositionChart anomalies={careInsights.anomalies} />
           <AnomalyBubbleCard anomalies={careInsights.anomalies} />
           <AnomalyRankCard anomalies={careInsights.anomalies} />
         </div>
-
       </div>
     </StepLayout>
   );
 }
 
 function ComparativeAnalysisPage() {
-  const { patient, modelResults, setModelResults, markStepComplete, markStepIncomplete } = usePatient();
+  const {
+    patient,
+    modelResults,
+    setModelResults,
+    markStepComplete,
+    markStepIncomplete,
+  } = usePatient();
   const step = flowSteps[3];
   const [isRunning, setIsRunning] = React.useState(false);
   const runTimerRef = React.useRef(null);
   const analysisReady = modelResults.status === "complete";
-  const backendConfig = React.useMemo(() => buildStackingConfig(patient), [patient]);
+  const backendConfig = React.useMemo(
+    () => buildStackingConfig(patient),
+    [patient],
+  );
 
-  React.useEffect(() => () => {
-    if (runTimerRef.current) {
-      clearTimeout(runTimerRef.current);
-    }
-  }, []);
+  React.useEffect(
+    () => () => {
+      if (runTimerRef.current) {
+        clearTimeout(runTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const handleRunAnalysis = React.useCallback(async () => {
     if (isRunning) {
@@ -5941,7 +7622,10 @@ function ComparativeAnalysisPage() {
     }));
 
     runTimerRef.current = setTimeout(async () => {
-      const results = computeAnalysisResults(patient, modelResults.history || []);
+      const results = computeAnalysisResults(
+        patient,
+        modelResults.history || [],
+      );
       let backendPrediction = null;
       try {
         const response = await axios.post("/predict", patient);
@@ -5963,7 +7647,15 @@ function ComparativeAnalysisPage() {
       setIsRunning(false);
       runTimerRef.current = null;
     }, 1200);
-  }, [backendConfig, isRunning, markStepComplete, modelResults.history, patient, setModelResults, step.slug]);
+  }, [
+    backendConfig,
+    isRunning,
+    markStepComplete,
+    modelResults.history,
+    patient,
+    setModelResults,
+    step.slug,
+  ]);
 
   const handleResetAnalysis = React.useCallback(() => {
     if (runTimerRef.current) {
@@ -5976,25 +7668,44 @@ function ComparativeAnalysisPage() {
   }, [markStepIncomplete, setModelResults, step.slug]);
 
   const comparisonRows = React.useMemo(
-    () => normalizeComparisonModels(analysisReady ? modelResults.modelRows : analysisModelCatalog),
+    () =>
+      normalizeComparisonModels(
+        analysisReady ? modelResults.modelRows : analysisModelCatalog,
+      ),
     [analysisReady, modelResults.modelRows],
   );
-  const bestModel = React.useMemo(() => getBestComparisonModel(comparisonRows), [comparisonRows]);
+  const bestModel = React.useMemo(
+    () => getBestComparisonModel(comparisonRows),
+    [comparisonRows],
+  );
   const comparisonInsights = React.useMemo(() => {
     const sortedByScore = [...comparisonRows].sort((a, b) => b.score - a.score);
-    const fastest = [...comparisonRows].sort(
-      (a, b) => (a.latencyMs ?? Number.POSITIVE_INFINITY) - (b.latencyMs ?? Number.POSITIVE_INFINITY),
-    )[0] || null;
-    const lightest = [...comparisonRows].sort(
-      (a, b) => (a.memoryMb ?? Number.POSITIVE_INFINITY) - (b.memoryMb ?? Number.POSITIVE_INFINITY),
-    )[0] || null;
+    const fastest =
+      [...comparisonRows].sort(
+        (a, b) =>
+          (a.latencyMs ?? Number.POSITIVE_INFINITY) -
+          (b.latencyMs ?? Number.POSITIVE_INFINITY),
+      )[0] || null;
+    const lightest =
+      [...comparisonRows].sort(
+        (a, b) =>
+          (a.memoryMb ?? Number.POSITIVE_INFINITY) -
+          (b.memoryMb ?? Number.POSITIVE_INFINITY),
+      )[0] || null;
     const bestTradeoff =
       [...comparisonRows].sort((a, b) => {
-        const aCost = clamp01((a.latencyMs ?? 0) / 12) * 0.08 + clamp01((a.memoryMb ?? 0) / 140) * 0.06;
-        const bCost = clamp01((b.latencyMs ?? 0) / 12) * 0.08 + clamp01((b.memoryMb ?? 0) / 140) * 0.06;
+        const aCost =
+          clamp01((a.latencyMs ?? 0) / 12) * 0.08 +
+          clamp01((a.memoryMb ?? 0) / 140) * 0.06;
+        const bCost =
+          clamp01((b.latencyMs ?? 0) / 12) * 0.08 +
+          clamp01((b.memoryMb ?? 0) / 140) * 0.06;
         return b.score - bCost - (a.score - aCost);
       })[0] || null;
-    const scoreSpread = sortedByScore.length > 1 ? sortedByScore[0].score - sortedByScore[sortedByScore.length - 1].score : 0;
+    const scoreSpread =
+      sortedByScore.length > 1
+        ? sortedByScore[0].score - sortedByScore[sortedByScore.length - 1].score
+        : 0;
     return {
       leader: sortedByScore[0] || null,
       fastest,
@@ -6022,7 +7733,9 @@ function ComparativeAnalysisPage() {
   const lightestModelName = comparisonInsights.lightest?.name || "Locked";
   const backendPrediction = modelResults.backendPrediction;
   const conformalPValue = backendPrediction?.conformal_p_value ?? null;
-  const conformalAssessment = backendPrediction?.conformal_assessment || "Run the anomaly test to see the conformal verdict.";
+  const conformalAssessment =
+    backendPrediction?.conformal_assessment ||
+    "Run the anomaly test to see the conformal verdict.";
   const conformalStatusLabel = backendPrediction
     ? conformalPValue !== null && conformalPValue <= 0.05
       ? "Anomalous at α=0.05"
@@ -6046,7 +7759,7 @@ function ComparativeAnalysisPage() {
       nextDisabled={!analysisReady}
       nextLabel="Continue to Decision Support"
       right={<ComparisonReferenceAreaCard {...referenceAreaProps} />}
-        left={
+      left={
         <div className="section-stack">
           <section className="analysis-control card">
             <div className="analysis-control__head">
@@ -6054,11 +7767,18 @@ function ComparativeAnalysisPage() {
                 <p className="eyebrow">Run / Reset</p>
                 <h3>Comparative analysis</h3>
                 <p className="section-card__description">
-                  Compare detector behavior, the best tradeoff, and how the leading models diverge.
+                  Compare detector behavior, the best tradeoff, and how the
+                  leading models diverge.
                 </p>
               </div>
-              <div className={`analysis-status-chip analysis-status-chip--${modelResults.status}`}>
-                {modelResults.status === "running" ? "Running" : analysisReady ? "Complete" : "Idle"}
+              <div
+                className={`analysis-status-chip analysis-status-chip--${modelResults.status}`}
+              >
+                {modelResults.status === "running"
+                  ? "Running"
+                  : analysisReady
+                    ? "Complete"
+                    : "Idle"}
               </div>
             </div>
             <div className="analysis-fetch-chip">
@@ -6066,10 +7786,21 @@ function ComparativeAnalysisPage() {
               <strong>{loadingLabel}</strong>
             </div>
             <div className="analysis-control__buttons">
-              <button type="button" className="button button--primary" onClick={handleRunAnalysis} disabled={isRunning}>
-                {isRunning ? "Running comparative analysis..." : "Run anomaly test"}
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={handleRunAnalysis}
+                disabled={isRunning}
+              >
+                {isRunning
+                  ? "Running comparative analysis..."
+                  : "Run anomaly test"}
               </button>
-              <button type="button" className="button button--ghost" onClick={handleResetAnalysis}>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={handleResetAnalysis}
+              >
                 Reset analysis
               </button>
             </div>
@@ -6084,11 +7815,17 @@ function ComparativeAnalysisPage() {
               </div>
               <div className="analysis-mini-card">
                 <span>Highest score</span>
-                <strong>{analysisReady ? `${Math.round((comparisonInsights.leader?.score ?? 0) * 100)}%` : "0%"}</strong>
+                <strong>
+                  {analysisReady
+                    ? `${Math.round((comparisonInsights.leader?.score ?? 0) * 100)}%`
+                    : "0%"}
+                </strong>
               </div>
               <div className="analysis-mini-card">
                 <span>Best tradeoff</span>
-                <strong>{comparisonInsights.bestTradeoff?.name || "Locked"}</strong>
+                <strong>
+                  {comparisonInsights.bestTradeoff?.name || "Locked"}
+                </strong>
               </div>
             </div>
           </section>
@@ -6106,7 +7843,9 @@ function ComparativeAnalysisPage() {
                 loading={false}
               />
             ) : (
-              <HistogramSeedCard currentScore={modelResults.overallScore ?? 0} />
+              <HistogramSeedCard
+                currentScore={modelResults.overallScore ?? 0}
+              />
             )}
           </AnalysisSection>
 
@@ -6135,7 +7874,9 @@ function ComparativeAnalysisPage() {
                 <div className="comparison-storyboard">
                   <div className="comparison-storyboard__item">
                     <span>Leading model</span>
-                    <strong>{comparisonInsights.leader?.name || "Locked"}</strong>
+                    <strong>
+                      {comparisonInsights.leader?.name || "Locked"}
+                    </strong>
                   </div>
                   <div className="comparison-storyboard__item">
                     <span>Score spread</span>
@@ -6147,7 +7888,12 @@ function ComparativeAnalysisPage() {
                   </div>
                   <div className="comparison-storyboard__item">
                     <span>Top tier count</span>
-                    <strong>{comparisonRows.filter((model) => model.score >= 0.85).length}</strong>
+                    <strong>
+                      {
+                        comparisonRows.filter((model) => model.score >= 0.85)
+                          .length
+                      }
+                    </strong>
                   </div>
                 </div>
                 <ModelComparisonChart models={comparisonRows} />
@@ -6201,7 +7947,11 @@ function ComparativeAnalysisPage() {
                 </div>
                 <div className="comparison-matrix-note">
                   <strong>Deployment read:</strong>
-                  <span>The fastest detector is not always the best one to keep online. The best tradeoff balances score with the smallest runtime burden.</span>
+                  <span>
+                    The fastest detector is not always the best one to keep
+                    online. The best tradeoff balances score with the smallest
+                    runtime burden.
+                  </span>
                 </div>
               </div>
             </AnalysisSection>
@@ -6215,7 +7965,10 @@ function ComparativeAnalysisPage() {
               description="Shows whether the latest run improved or worsened the score, and by how much."
               lockMessage="Run the anomaly test to unlock the before and after view."
             >
-              <ProgressComparisonCard beforeAfter={modelResults.beforeAfter} progression={modelResults.progression} />
+              <ProgressComparisonCard
+                beforeAfter={modelResults.beforeAfter}
+                progression={modelResults.progression}
+              />
             </AnalysisSection>
 
             <AnalysisSection
@@ -6230,17 +7983,29 @@ function ComparativeAnalysisPage() {
                   <div className="comparison-narrative__card">
                     <span>Best balance</span>
                     <strong>{selectedModelName}</strong>
-                    <p>{analysisReady ? "Highest overall balance of predictive quality and operational cost." : "Run the anomaly test to reveal the best balance."}</p>
+                    <p>
+                      {analysisReady
+                        ? "Highest overall balance of predictive quality and operational cost."
+                        : "Run the anomaly test to reveal the best balance."}
+                    </p>
                   </div>
                   <div className="comparison-narrative__card">
                     <span>Quickest to serve</span>
                     <strong>{fastestModelName}</strong>
-                    <p>{analysisReady ? "Lowest latency for quick deployment and faster responses." : "Run the anomaly test to reveal the fastest detector."}</p>
+                    <p>
+                      {analysisReady
+                        ? "Lowest latency for quick deployment and faster responses."
+                        : "Run the anomaly test to reveal the fastest detector."}
+                    </p>
                   </div>
                   <div className="comparison-narrative__card">
                     <span>Most lightweight</span>
                     <strong>{lightestModelName}</strong>
-                    <p>{analysisReady ? "Smallest memory footprint for constrained hardware." : "Run the anomaly test to reveal the lightest detector."}</p>
+                    <p>
+                      {analysisReady
+                        ? "Smallest memory footprint for constrained hardware."
+                        : "Run the anomaly test to reveal the lightest detector."}
+                    </p>
                   </div>
                 </div>
                 <div className="callout callout--soft">
@@ -6269,32 +8034,54 @@ function ComparativeAnalysisPage() {
 }
 
 function DecisionSupportPage() {
-  const { patient, modelResults, updateSection, setModelResults } = usePatient();
+  const { patient, modelResults, updateSection, setModelResults } =
+    usePatient();
   const step = flowSteps[4];
   const analysisReady = modelResults.status === "complete";
   const comparisonRows = React.useMemo(
-    () => normalizeComparisonModels(analysisReady ? modelResults.modelRows : analysisModelCatalog),
+    () =>
+      normalizeComparisonModels(
+        analysisReady ? modelResults.modelRows : analysisModelCatalog,
+      ),
     [analysisReady, modelResults.modelRows],
   );
-  const bestModel = React.useMemo(() => getBestComparisonModel(comparisonRows), [comparisonRows]);
-  const consensusModels = React.useMemo(() => [...comparisonRows].sort((a, b) => b.score - a.score).slice(0, 4), [comparisonRows]);
+  const bestModel = React.useMemo(
+    () => getBestComparisonModel(comparisonRows),
+    [comparisonRows],
+  );
+  const consensusModels = React.useMemo(
+    () => [...comparisonRows].sort((a, b) => b.score - a.score).slice(0, 4),
+    [comparisonRows],
+  );
   const topSignals = React.useMemo(
-    () => (modelResults.shapSummary?.length ? modelResults.shapSummary : modelResults.featureAttributions || []).slice(0, 6),
+    () =>
+      (modelResults.shapSummary?.length
+        ? modelResults.shapSummary
+        : modelResults.featureAttributions || []
+      ).slice(0, 6),
     [modelResults.featureAttributions, modelResults.shapSummary],
   );
   const consensusScore = React.useMemo(() => {
     if (!consensusModels.length) {
       return 0;
     }
-    return consensusModels.reduce((sum, model) => sum + model.score, 0) / consensusModels.length;
+    return (
+      consensusModels.reduce((sum, model) => sum + model.score, 0) /
+      consensusModels.length
+    );
   }, [consensusModels]);
   const consensusSpread = React.useMemo(() => {
     if (consensusModels.length < 2) {
       return 0;
     }
-    return consensusModels[0].score - consensusModels[consensusModels.length - 1].score;
+    return (
+      consensusModels[0].score -
+      consensusModels[consensusModels.length - 1].score
+    );
   }, [consensusModels]);
-  const riskAction = getRiskAction(analysisReady ? modelResults.riskLevel : "Low");
+  const riskAction = getRiskAction(
+    analysisReady ? modelResults.riskLevel : "Low",
+  );
   const decisionGuidance = React.useMemo(
     () =>
       analysisReady
@@ -6310,7 +8097,14 @@ function DecisionSupportPage() {
             followUpPlan: [],
             references: [],
           },
-    [analysisReady, comparisonRows, consensusScore, consensusSpread, modelResults.riskLevel, topSignals],
+    [
+      analysisReady,
+      comparisonRows,
+      consensusScore,
+      consensusSpread,
+      modelResults.riskLevel,
+      topSignals,
+    ],
   );
   const handleShapPairSelect = React.useCallback(
     (pair) => {
@@ -6325,40 +8119,62 @@ function DecisionSupportPage() {
   const immediateRecommendations = decisionGuidance.immediateRecommendations;
   const followUpPlan = decisionGuidance.followUpPlan;
   const references = decisionGuidance.references;
-  const screeningLabel = analysisReady ? `${modelResults.riskLevel} risk` : "Awaiting analysis";
-  const screeningTone = analysisReady ? modelResults.riskLevel.toLowerCase() : "locked";
-  const scoreLabel = analysisReady ? modelResults.overallScore.toFixed(2) : "0.00";
+  const screeningLabel = analysisReady
+    ? `${modelResults.riskLevel} risk`
+    : "Awaiting analysis";
+  const screeningTone = analysisReady
+    ? modelResults.riskLevel.toLowerCase()
+    : "locked";
+  const scoreLabel = analysisReady
+    ? modelResults.overallScore.toFixed(2)
+    : "0.00";
   const backendPrediction = modelResults.backendPrediction;
   const selectedShapPair = modelResults.shapSelectedPair;
   const selectedShapNarrative =
-    modelResults.shapSelectedNarrative || "Click a pair in the heatmap to sync its narrative here.";
+    modelResults.shapSelectedNarrative ||
+    "Click a pair in the heatmap to sync its narrative here.";
   const conformalPValue = backendPrediction?.conformal_p_value ?? null;
-  const sequenceScore = backendPrediction?.prediction?.sequence_anomaly_score ?? null;
-  const sequenceScoreNormalized = backendPrediction?.prediction?.sequence_anomaly_score_normalized ?? null;
-  const sequenceHistoryLength = backendPrediction?.prediction?.sequence_history_length ?? 0;
-  const driftAlarm = backendPrediction?.prediction?.score_stream_drift_alarm ?? false;
-  const driftMethod = backendPrediction?.prediction?.score_stream_drift_method ?? "none";
+  const sequenceScore =
+    backendPrediction?.prediction?.sequence_anomaly_score ?? null;
+  const sequenceScoreNormalized =
+    backendPrediction?.prediction?.sequence_anomaly_score_normalized ?? null;
+  const sequenceHistoryLength =
+    backendPrediction?.prediction?.sequence_history_length ?? 0;
+  const driftAlarm =
+    backendPrediction?.prediction?.score_stream_drift_alarm ?? false;
+  const driftMethod =
+    backendPrediction?.prediction?.score_stream_drift_method ?? "none";
   const scoreStream = Array.isArray(backendPrediction?.prediction?.score_stream)
     ? backendPrediction.prediction.score_stream
     : [];
-  const driftChangeIndexValue = backendPrediction?.prediction?.score_stream_drift_change_index;
+  const driftChangeIndexValue =
+    backendPrediction?.prediction?.score_stream_drift_change_index;
   const driftChangeIndex = Array.isArray(driftChangeIndexValue)
-    ? driftChangeIndexValue.find((value) => Number.isInteger(Number(value)) && Number(value) >= 0) ?? null
-    : Number.isInteger(Number(driftChangeIndexValue)) && Number(driftChangeIndexValue) >= 0
+    ? (driftChangeIndexValue.find(
+        (value) => Number.isInteger(Number(value)) && Number(value) >= 0,
+      ) ?? null)
+    : Number.isInteger(Number(driftChangeIndexValue)) &&
+        Number(driftChangeIndexValue) >= 0
       ? Number(driftChangeIndexValue)
       : null;
   const conformalAssessment =
-    backendPrediction?.conformal_assessment || "Run the backend scoring path to get a conformal verdict.";
+    backendPrediction?.conformal_assessment ||
+    "Run the backend scoring path to get a conformal verdict.";
   const conformalStatusLabel = backendPrediction
     ? conformalPValue !== null && conformalPValue <= 0.05
       ? "Anomalous at α=0.05"
       : "Not anomalous at α=0.05"
     : "Awaiting backend scoring";
-  const conformalPayload = backendPrediction?.prediction && typeof backendPrediction.prediction === "object"
-    ? backendPrediction.prediction
-    : backendPrediction || {};
-  const resolvedConformalRawValue = conformalPayload?.conformal_p_value ?? backendPrediction?.conformal_p_value;
-  const resolvedConformalPValue = Number.isFinite(Number(resolvedConformalRawValue))
+  const conformalPayload =
+    backendPrediction?.prediction &&
+    typeof backendPrediction.prediction === "object"
+      ? backendPrediction.prediction
+      : backendPrediction || {};
+  const resolvedConformalRawValue =
+    conformalPayload?.conformal_p_value ?? backendPrediction?.conformal_p_value;
+  const resolvedConformalPValue = Number.isFinite(
+    Number(resolvedConformalRawValue),
+  )
     ? Number(resolvedConformalRawValue)
     : Number.isFinite(Number(modelResults.overallScore))
       ? clamp01(1 - Number(modelResults.overallScore))
@@ -6375,34 +8191,52 @@ function DecisionSupportPage() {
       : resolvedConformalPValue <= 0.05
         ? "Anomalous at α=0.05"
         : "Not anomalous at α=0.05";
-  const resolvedScoreStream = Array.isArray(conformalPayload?.score_stream) ? conformalPayload.score_stream : [];
-  const resolvedDriftChangeIndexValue = conformalPayload?.score_stream_drift_change_index;
+  const resolvedScoreStream = Array.isArray(conformalPayload?.score_stream)
+    ? conformalPayload.score_stream
+    : [];
+  const resolvedDriftChangeIndexValue =
+    conformalPayload?.score_stream_drift_change_index;
   const resolvedDriftChangeIndex = Array.isArray(resolvedDriftChangeIndexValue)
-    ? resolvedDriftChangeIndexValue.find((value) => Number.isInteger(Number(value)) && Number(value) >= 0) ?? null
-    : Number.isInteger(Number(resolvedDriftChangeIndexValue)) && Number(resolvedDriftChangeIndexValue) >= 0
+    ? (resolvedDriftChangeIndexValue.find(
+        (value) => Number.isInteger(Number(value)) && Number(value) >= 0,
+      ) ?? null)
+    : Number.isInteger(Number(resolvedDriftChangeIndexValue)) &&
+        Number(resolvedDriftChangeIndexValue) >= 0
       ? Number(resolvedDriftChangeIndexValue)
       : null;
   const resolvedSequenceHistoryLength =
     Number(conformalPayload?.sequence_history_length ?? 0) ||
     resolvedScoreStream.length ||
     (Array.isArray(modelResults.history) ? modelResults.history.length : 0);
-  const resolvedSequenceScore =
-    Number.isFinite(Number(conformalPayload?.sequence_anomaly_score))
-      ? Number(conformalPayload.sequence_anomaly_score)
-      : Number.isFinite(Number(resolvedScoreStream[resolvedScoreStream.length - 1]))
-        ? Number(resolvedScoreStream[resolvedScoreStream.length - 1])
-        : Number.isFinite(Number(modelResults.overallScore))
-          ? Number(modelResults.overallScore)
-          : null;
-  const resolvedSequenceScoreNormalized =
-    Number.isFinite(Number(conformalPayload?.sequence_anomaly_score_normalized))
-      ? Number(conformalPayload.sequence_anomaly_score_normalized)
-      : resolvedSequenceScore === null
-        ? null
-        : clamp01((resolvedSequenceScore + clamp01(Number(modelResults.overallScore ?? 0))) / 2);
+  const resolvedSequenceScore = Number.isFinite(
+    Number(conformalPayload?.sequence_anomaly_score),
+  )
+    ? Number(conformalPayload.sequence_anomaly_score)
+    : Number.isFinite(
+          Number(resolvedScoreStream[resolvedScoreStream.length - 1]),
+        )
+      ? Number(resolvedScoreStream[resolvedScoreStream.length - 1])
+      : Number.isFinite(Number(modelResults.overallScore))
+        ? Number(modelResults.overallScore)
+        : null;
+  const resolvedSequenceScoreNormalized = Number.isFinite(
+    Number(conformalPayload?.sequence_anomaly_score_normalized),
+  )
+    ? Number(conformalPayload.sequence_anomaly_score_normalized)
+    : resolvedSequenceScore === null
+      ? null
+      : clamp01(
+          (resolvedSequenceScore +
+            clamp01(Number(modelResults.overallScore ?? 0))) /
+            2,
+        );
   const resolvedDriftAlarm =
     Boolean(conformalPayload?.score_stream_drift_alarm) ||
-    (resolvedScoreStream.length > 1 && Math.abs(Number(resolvedScoreStream[resolvedScoreStream.length - 1]) - Number(resolvedScoreStream[0])) >= 0.08);
+    (resolvedScoreStream.length > 1 &&
+      Math.abs(
+        Number(resolvedScoreStream[resolvedScoreStream.length - 1]) -
+          Number(resolvedScoreStream[0]),
+      ) >= 0.08);
   const resolvedDriftMethod =
     conformalPayload?.score_stream_drift_method ||
     (resolvedScoreStream.length > 1 ? "trend-delta" : "none");
@@ -6509,7 +8343,9 @@ function DecisionSupportPage() {
               </div>
               <div className="result-stat">
                 <span>Primary model</span>
-                <strong>{analysisReady ? modelResults.primaryModel : "Locked"}</strong>
+                <strong>
+                  {analysisReady ? modelResults.primaryModel : "Locked"}
+                </strong>
               </div>
               <div className="result-stat">
                 <span>Current status</span>
@@ -6522,7 +8358,11 @@ function DecisionSupportPage() {
               <div className="mini-metrics">
                 <div>
                   <span>p-value</span>
-                  <strong>{resolvedConformalPValue === null ? "N/A" : resolvedConformalPValue.toFixed(4)}</strong>
+                  <strong>
+                    {resolvedConformalPValue === null
+                      ? "N/A"
+                      : resolvedConformalPValue.toFixed(4)}
+                  </strong>
                 </div>
                 <div>
                   <span>Significance</span>
@@ -6530,19 +8370,33 @@ function DecisionSupportPage() {
                 </div>
                 <div>
                   <span>Visit sequence</span>
-                  <strong>{resolvedSequenceHistoryLength ? `${resolvedSequenceHistoryLength} visits` : "No history"}</strong>
+                  <strong>
+                    {resolvedSequenceHistoryLength
+                      ? `${resolvedSequenceHistoryLength} visits`
+                      : "No history"}
+                  </strong>
                 </div>
                 <div>
                   <span>Sequence score</span>
-                  <strong>{resolvedSequenceScore === null ? "N/A" : Number(resolvedSequenceScore).toFixed(4)}</strong>
+                  <strong>
+                    {resolvedSequenceScore === null
+                      ? "N/A"
+                      : Number(resolvedSequenceScore).toFixed(4)}
+                  </strong>
                 </div>
                 <div>
                   <span>Sequence blend</span>
-                  <strong>{resolvedSequenceScoreNormalized === null ? "N/A" : Number(resolvedSequenceScoreNormalized).toFixed(4)}</strong>
+                  <strong>
+                    {resolvedSequenceScoreNormalized === null
+                      ? "N/A"
+                      : Number(resolvedSequenceScoreNormalized).toFixed(4)}
+                  </strong>
                 </div>
                 <div>
                   <span>Trend drift</span>
-                  <strong>{resolvedDriftAlarm ? "Shift detected" : "Stable"}</strong>
+                  <strong>
+                    {resolvedDriftAlarm ? "Shift detected" : "Stable"}
+                  </strong>
                 </div>
                 <div>
                   <span>Drift method</span>
@@ -6582,25 +8436,38 @@ function DecisionSupportPage() {
               onSelectPair={handleShapPairSelect}
             />
             <ul className="bullet-list">
-              {(topSignals.length ? topSignals : [{ feature: "Waiting for analysis" }]).slice(0, 3).map((signal) => (
-                <li key={signal.feature || signal.name}>
-                  {signal.feature || signal.name}
-                  {signal.contribution ? ` - ${Math.round(signal.contribution * 100)}% contribution` : ""}
-                </li>
-              ))}
+              {(topSignals.length
+                ? topSignals
+                : [{ feature: "Waiting for analysis" }]
+              )
+                .slice(0, 3)
+                .map((signal) => (
+                  <li key={signal.feature || signal.name}>
+                    {signal.feature || signal.name}
+                    {signal.contribution
+                      ? ` - ${Math.round(signal.contribution * 100)}% contribution`
+                      : ""}
+                  </li>
+                ))}
             </ul>
           </AnalysisSection>
 
           <section className="recommendation-card recommendation-card--neutral recommendation-card--tight">
             <p className="eyebrow">Selected pair</p>
-            <h3>{selectedShapPair ? `${selectedShapPair.feature_i} + ${selectedShapPair.feature_j}` : "Waiting for a heatmap click"}</h3>
+            <h3>
+              {selectedShapPair
+                ? `${selectedShapPair.feature_i} + ${selectedShapPair.feature_j}`
+                : "Waiting for a heatmap click"}
+            </h3>
             <p className="section-card__description">{selectedShapNarrative}</p>
           </section>
 
           <section className="recommendation-card">
             <p className="eyebrow">Risk action</p>
             <h3>{riskAction.title}</h3>
-            <p className="section-card__description">{riskAction.description}</p>
+            <p className="section-card__description">
+              {riskAction.description}
+            </p>
             <div className="callout callout--accent">
               <strong>Suggested disposition</strong>
               <p>
@@ -6614,7 +8481,6 @@ function DecisionSupportPage() {
               </p>
             </div>
           </section>
-
         </div>
       }
       right={
@@ -6639,23 +8505,33 @@ function DecisionSupportPage() {
             <DecisionRiskMap models={comparisonRows} />
           </AnalysisSection>
 
-          <section className={`recommendation-card recommendation-card--${screeningTone}`}>
+          <section
+            className={`recommendation-card recommendation-card--${screeningTone}`}
+          >
             <p className="eyebrow">Immediate recommendations</p>
             <h3>What to do now</h3>
             <ul className="bullet-list">
               {analysisReady
-                ? immediateRecommendations.map((item) => <li key={item}>{item}</li>)
-                : ["Run the anomaly test to generate recommendations."].map((item) => <li key={item}>{item}</li>)}
+                ? immediateRecommendations.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))
+                : ["Run the anomaly test to generate recommendations."].map(
+                    (item) => <li key={item}>{item}</li>,
+                  )}
             </ul>
           </section>
 
-          <section className={`recommendation-card recommendation-card--${screeningTone}`}>
+          <section
+            className={`recommendation-card recommendation-card--${screeningTone}`}
+          >
             <p className="eyebrow">Follow-up plan</p>
             <h3>Next-touch plan</h3>
             <ul className="bullet-list">
               {analysisReady
                 ? followUpPlan.map((item) => <li key={item}>{item}</li>)
-                : ["Run the anomaly test to generate a follow-up plan."].map((item) => <li key={item}>{item}</li>)}
+                : ["Run the anomaly test to generate a follow-up plan."].map(
+                    (item) => <li key={item}>{item}</li>,
+                  )}
             </ul>
           </section>
 
@@ -6665,7 +8541,9 @@ function DecisionSupportPage() {
             <ul className="bullet-list">
               {analysisReady
                 ? references.map((item) => <li key={item}>{item}</li>)
-                : ["Run the anomaly test to generate source guidance."].map((item) => <li key={item}>{item}</li>)}
+                : ["Run the anomaly test to generate source guidance."].map(
+                    (item) => <li key={item}>{item}</li>,
+                  )}
             </ul>
           </section>
         </div>
@@ -6678,8 +8556,14 @@ function DecisionSupportPage() {
 function BackendProcessingPage() {
   const { patient, updateSection } = usePatient();
   const step = flowSteps[5];
-  const pipeline = React.useMemo(() => buildFeatureEngineeringPipeline(patient), [patient]);
-  const stackingConfig = React.useMemo(() => buildStackingConfig(patient), [patient]);
+  const pipeline = React.useMemo(
+    () => buildFeatureEngineeringPipeline(patient),
+    [patient],
+  );
+  const stackingConfig = React.useMemo(
+    () => buildStackingConfig(patient),
+    [patient],
+  );
 
   const syncPipeline = React.useCallback(() => {
     updateSection("backendProcessing", {
@@ -6687,7 +8571,13 @@ function BackendProcessingPage() {
       featureCount: pipeline.engineeredCount + pipeline.encodedCount,
       stackingConfig,
     });
-  }, [pipeline.encodedCount, pipeline.engineeredCount, pipeline.pipelineStatus, stackingConfig, updateSection]);
+  }, [
+    pipeline.encodedCount,
+    pipeline.engineeredCount,
+    pipeline.pipelineStatus,
+    stackingConfig,
+    updateSection,
+  ]);
 
   const resetPipeline = React.useCallback(() => {
     updateSection("backendProcessing", {
@@ -6707,11 +8597,15 @@ function BackendProcessingPage() {
                 <p className="eyebrow">Feature eng. pipeline</p>
                 <h3>Backend processing</h3>
                 <p className="section-card__description">
-                  Build, normalize, and bundle model-ready features from the patient intake and lab record.
+                  Build, normalize, and bundle model-ready features from the
+                  patient intake and lab record.
                 </p>
               </div>
-              <div className={`analysis-status-chip analysis-status-chip--${pipeline.missingCount ? "idle" : "complete"}`}>
-                {patient.backendProcessing.pipelineStatus || pipeline.pipelineStatus}
+              <div
+                className={`analysis-status-chip analysis-status-chip--${pipeline.missingCount ? "idle" : "complete"}`}
+              >
+                {patient.backendProcessing.pipelineStatus ||
+                  pipeline.pipelineStatus}
               </div>
             </div>
             <div className="backend-control-grid">
@@ -6719,7 +8613,11 @@ function BackendProcessingPage() {
                 <span>Pipeline status</span>
                 <select
                   value={patient.backendProcessing.pipelineStatus}
-                  onChange={(e) => updateSection("backendProcessing", { pipelineStatus: e.target.value })}
+                  onChange={(e) =>
+                    updateSection("backendProcessing", {
+                      pipelineStatus: e.target.value,
+                    })
+                  }
                 >
                   <option value="Draft">Draft</option>
                   <option value="Validating">Validating</option>
@@ -6732,15 +8630,27 @@ function BackendProcessingPage() {
                 <input
                   type="number"
                   value={patient.backendProcessing.featureCount}
-                  onChange={(e) => updateSection("backendProcessing", { featureCount: Number(e.target.value) })}
+                  onChange={(e) =>
+                    updateSection("backendProcessing", {
+                      featureCount: Number(e.target.value),
+                    })
+                  }
                 />
               </label>
             </div>
             <div className="analysis-control__buttons">
-              <button type="button" className="button button--primary" onClick={syncPipeline}>
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={syncPipeline}
+              >
                 Run feature engineering pipeline
               </button>
-              <button type="button" className="button button--ghost" onClick={resetPipeline}>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={resetPipeline}
+              >
                 Reset pipeline
               </button>
             </div>
@@ -6773,7 +8683,8 @@ function BackendProcessingPage() {
                   <h3>Stacking settings attached to this run</h3>
                 </div>
                 <p className="section-card__description">
-                  These values are shared with the model hub so the selected meta-model follows the dashboard controls.
+                  These values are shared with the model hub so the selected
+                  meta-model follows the dashboard controls.
                 </p>
               </div>
               <div className="backend-config-grid">
@@ -6783,7 +8694,9 @@ function BackendProcessingPage() {
                 </div>
                 <div className="summary-pill">
                   <span>Hidden layers</span>
-                  <strong>{stackingConfig.stacking_hidden_layer_sizes.join(", ")}</strong>
+                  <strong>
+                    {stackingConfig.stacking_hidden_layer_sizes.join(", ")}
+                  </strong>
                 </div>
                 <div className="summary-pill">
                   <span>Alpha</span>
@@ -6826,7 +8739,8 @@ function BackendProcessingPage() {
                 <h3>Feature engineering flow</h3>
               </div>
               <p className="section-card__description">
-                The sequence below traces the raw data into normalized, model-ready features.
+                The sequence below traces the raw data into normalized,
+                model-ready features.
               </p>
             </div>
             <PipelineTimelineCard stages={pipeline.stages} />
@@ -6838,8 +8752,9 @@ function BackendProcessingPage() {
           <div className="callout callout--soft">
             <strong>Backend trace</strong>
             <p>
-              This page now computes a reusable feature bundle from the current patient record and exposes the
-              derived feature count to the model hub.
+              This page now computes a reusable feature bundle from the current
+              patient record and exposes the derived feature count to the model
+              hub.
             </p>
           </div>
 
@@ -6852,7 +8767,8 @@ function BackendProcessingPage() {
                 <h3>Encoded categorical signals</h3>
               </div>
               <p className="section-card__description">
-                Categorical values are converted into numeric model inputs before the engineered features are bundled.
+                Categorical values are converted into numeric model inputs
+                before the engineered features are bundled.
               </p>
             </div>
             <div className="backend-feature-list">
@@ -6863,7 +8779,9 @@ function BackendProcessingPage() {
                     <span>{Math.round(feature.value * 100)}%</span>
                   </div>
                   <div className="bar" aria-hidden="true">
-                    <span style={{ width: `${Math.max(8, feature.value * 100)}%` }} />
+                    <span
+                      style={{ width: `${Math.max(8, feature.value * 100)}%` }}
+                    />
                   </div>
                   <p>{feature.source}</p>
                 </article>
@@ -6877,7 +8795,10 @@ function BackendProcessingPage() {
                 <p className="eyebrow">Derived features</p>
                 <h3>Top engineered signals</h3>
               </div>
-              <p className="section-card__description">The strongest engineered features are ready for scoring and export.</p>
+              <p className="section-card__description">
+                The strongest engineered features are ready for scoring and
+                export.
+              </p>
             </div>
             <div className="backend-feature-list">
               {pipeline.engineeredFeatures.slice(0, 6).map((feature) => (
@@ -6887,7 +8808,9 @@ function BackendProcessingPage() {
                     <span>{Math.round(feature.value * 100)}%</span>
                   </div>
                   <div className="bar" aria-hidden="true">
-                    <span style={{ width: `${Math.max(8, feature.value * 100)}%` }} />
+                    <span
+                      style={{ width: `${Math.max(8, feature.value * 100)}%` }}
+                    />
                   </div>
                   <p>{feature.source}</p>
                 </article>
@@ -6899,9 +8822,19 @@ function BackendProcessingPage() {
             <p className="eyebrow">Validation summary</p>
             <h3>What the pipeline is ready for</h3>
             <ul className="bullet-list">
-              <li>{pipeline.cleanedCount} of {pipeline.rawCount} inputs are clean and usable.</li>
-              <li>{pipeline.engineeredCount} derived features are available for model scoring.</li>
-              <li>{pipeline.missingCount === 0 ? "No missing values remain in the current bundle." : `${pipeline.missingCount} missing values still need attention.`}</li>
+              <li>
+                {pipeline.cleanedCount} of {pipeline.rawCount} inputs are clean
+                and usable.
+              </li>
+              <li>
+                {pipeline.engineeredCount} derived features are available for
+                model scoring.
+              </li>
+              <li>
+                {pipeline.missingCount === 0
+                  ? "No missing values remain in the current bundle."
+                  : `${pipeline.missingCount} missing values still need attention.`}
+              </li>
               <li>{pipeline.pipelineStatus} is the current bundle state.</li>
             </ul>
           </section>
@@ -6913,11 +8846,14 @@ function BackendProcessingPage() {
 }
 
 function ModelAnalyticalHubPage() {
-  const { patient, modelResults, updateSection, modelConfigSaveState } = usePatient();
+  const { patient, modelResults, updateSection, modelConfigSaveState } =
+    usePatient();
   const step = flowSteps[6];
   const hubGroups = React.useMemo(() => {
     const groups = getModelHubGroups();
-    const isVisible = (model) => model.key !== "anomaly-transformer" && model.name !== "Anomaly Transformer";
+    const isVisible = (model) =>
+      model.key !== "anomaly-transformer" &&
+      model.name !== "Anomaly Transformer";
     const catalog = groups.catalog.filter(isVisible);
     return {
       ...groups,
@@ -6928,43 +8864,74 @@ function ModelAnalyticalHubPage() {
     };
   }, []);
   const analysisReady = modelResults.status === "complete";
-  const conformalPValue = modelResults.backendPrediction?.conformal_p_value ?? null;
-  const sequenceScore = modelResults.backendPrediction?.prediction?.sequence_anomaly_score ?? null;
-  const sequenceScoreNormalized = modelResults.backendPrediction?.prediction?.sequence_anomaly_score_normalized ?? null;
-  const sequenceHistoryLength = modelResults.backendPrediction?.prediction?.sequence_history_length ?? 0;
-  const driftAlarm = modelResults.backendPrediction?.prediction?.score_stream_drift_alarm ?? false;
-  const driftMethod = modelResults.backendPrediction?.prediction?.score_stream_drift_method ?? "none";
-  const reconstructionResidualHeatmap = modelResults.backendPrediction?.reconstruction_residual_heatmap ?? null;
+  const conformalPValue =
+    modelResults.backendPrediction?.conformal_p_value ?? null;
+  const sequenceScore =
+    modelResults.backendPrediction?.prediction?.sequence_anomaly_score ?? null;
+  const sequenceScoreNormalized =
+    modelResults.backendPrediction?.prediction
+      ?.sequence_anomaly_score_normalized ?? null;
+  const sequenceHistoryLength =
+    modelResults.backendPrediction?.prediction?.sequence_history_length ?? 0;
+  const driftAlarm =
+    modelResults.backendPrediction?.prediction?.score_stream_drift_alarm ??
+    false;
+  const driftMethod =
+    modelResults.backendPrediction?.prediction?.score_stream_drift_method ??
+    "none";
+  const reconstructionResidualHeatmap =
+    modelResults.backendPrediction?.reconstruction_residual_heatmap ?? null;
   const conformalAssessment =
-    modelResults.backendPrediction?.conformal_assessment || "Run the backend scoring path to get a conformal verdict.";
+    modelResults.backendPrediction?.conformal_assessment ||
+    "Run the backend scoring path to get a conformal verdict.";
   const conformalStatusLabel = modelResults.backendPrediction
     ? conformalPValue !== null && conformalPValue <= 0.05
       ? "Anomalous at α=0.05"
       : "Not anomalous at α=0.05"
     : "Awaiting backend scoring";
   const activeModel = React.useMemo(
-    () => hubGroups.catalog.find((model) => model.name === patient.modelHub.activeModel) || hubGroups.catalog[0] || null,
+    () =>
+      hubGroups.catalog.find(
+        (model) => model.name === patient.modelHub.activeModel,
+      ) ||
+      hubGroups.catalog[0] ||
+      null,
     [hubGroups.catalog, patient.modelHub.activeModel],
   );
   const activeModelRank = React.useMemo(() => {
     if (!activeModel) {
       return null;
     }
-    const ranked = [...hubGroups.catalog].sort((a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0));
+    const ranked = [...hubGroups.catalog].sort(
+      (a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0),
+    );
     return ranked.findIndex((model) => model.key === activeModel.key) + 1;
   }, [activeModel, hubGroups.catalog]);
   const primaryModel = React.useMemo(
-    () => [...hubGroups.catalog].sort((a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0))[0] || null,
+    () =>
+      [...hubGroups.catalog].sort(
+        (a, b) => (b.f1 ?? b.score ?? 0) - (a.f1 ?? a.score ?? 0),
+      )[0] || null,
     [hubGroups.catalog],
   );
   const latentManifold = React.useMemo(
-    () => modelResults.backendPrediction?.latent_manifold || buildFallbackLatentManifold(hubGroups.catalog, activeModel, primaryModel),
-    [activeModel, hubGroups.catalog, modelResults.backendPrediction, primaryModel],
+    () =>
+      modelResults.backendPrediction?.latent_manifold ||
+      buildFallbackLatentManifold(hubGroups.catalog, activeModel, primaryModel),
+    [
+      activeModel,
+      hubGroups.catalog,
+      modelResults.backendPrediction,
+      primaryModel,
+    ],
   );
   const residualHeatmap = React.useMemo(
     () =>
       modelResults.backendPrediction?.reconstruction_residual_heatmap ||
-      buildFallbackReconstructionResidualHeatmap(hubGroups.catalog, activeModel),
+      buildFallbackReconstructionResidualHeatmap(
+        hubGroups.catalog,
+        activeModel,
+      ),
     [activeModel, hubGroups.catalog, modelResults.backendPrediction],
   );
 
@@ -6980,17 +8947,23 @@ function ModelAnalyticalHubPage() {
                 <p className="eyebrow">Model hub</p>
                 <h3>Trained model inventory</h3>
                 <p className="section-card__description">
-                  Every trained model is organized into machine learning and deep learning families for faster review.
+                  Every trained model is organized into machine learning and
+                  deep learning families for faster review.
                 </p>
               </div>
             </div>
-            <ModelHubOverview groups={hubGroups} activeModel={patient.modelHub.activeModel} />
+            <ModelHubOverview
+              groups={hubGroups}
+              activeModel={patient.modelHub.activeModel}
+            />
             <div className="model-hub-controls">
               <label>
                 <span>Active model</span>
                 <select
                   value={patient.modelHub.activeModel}
-                  onChange={(e) => updateSection("modelHub", { activeModel: e.target.value })}
+                  onChange={(e) =>
+                    updateSection("modelHub", { activeModel: e.target.value })
+                  }
                 >
                   {hubGroups.catalog.map((model) => (
                     <option key={model.key} value={model.name}>
@@ -7004,105 +8977,145 @@ function ModelAnalyticalHubPage() {
                 <textarea
                   rows="5"
                   value={patient.modelHub.reviewNote}
-                  onChange={(e) => updateSection("modelHub", { reviewNote: e.target.value })}
-                  />
+                  onChange={(e) =>
+                    updateSection("modelHub", { reviewNote: e.target.value })
+                  }
+                />
               </label>
             </div>
           </section>
 
           {false ? (
-          <section className="model-hub-focus">
-            <div className="section-card__head">
-              <div>
-                <p className="eyebrow">Model in use</p>
-                <h3>Currently deployed model</h3>
+            <section className="model-hub-focus">
+              <div className="section-card__head">
+                <div>
+                  <p className="eyebrow">Model in use</p>
+                  <h3>Currently deployed model</h3>
+                </div>
+                <p className="section-card__description">
+                  The selected model stays visible as the hub anchor for
+                  downstream analysis and deployment.
+                </p>
               </div>
-              <p className="section-card__description">
-                The selected model stays visible as the hub anchor for downstream analysis and deployment.
-              </p>
-            </div>
-            <div className="model-hub-focus__card">
-              <div className="model-hub-focus__top">
-                <strong>{activeModel?.name || "N/A"}</strong>
-                <ModelFamilyBadge family={activeModel?.family} label={activeModel?.familyLabel || "Model"} />
+              <div className="model-hub-focus__card">
+                <div className="model-hub-focus__top">
+                  <strong>{activeModel?.name || "N/A"}</strong>
+                  <ModelFamilyBadge
+                    family={activeModel?.family}
+                    label={activeModel?.familyLabel || "Model"}
+                  />
+                </div>
+                <div className="model-hub-focus__metrics">
+                  <div>
+                    <span>Primary model</span>
+                    <strong>{primaryModel?.name || "N/A"}</strong>
+                  </div>
+                  <div>
+                    <span>Rank</span>
+                    <strong>{activeModelRank || "N/A"}</strong>
+                  </div>
+                  <div>
+                    <span>F1</span>
+                    <strong>
+                      {activeModel
+                        ? `${Math.round((activeModel.f1 ?? activeModel.score ?? 0) * 100)}%`
+                        : "N/A"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Latency</span>
+                    <strong>{activeModel?.latencyMs ?? "N/A"} ms</strong>
+                  </div>
+                  <div>
+                    <span>Memory</span>
+                    <strong>{activeModel?.memoryMb ?? "N/A"} MB</strong>
+                  </div>
+                  <div>
+                    <span>Conformal p-value</span>
+                    <strong>
+                      {conformalPValue === null
+                        ? "N/A"
+                        : conformalPValue.toFixed(4)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Verdict</span>
+                    <strong>{conformalStatusLabel}</strong>
+                  </div>
+                  <div>
+                    <span>Visit sequence</span>
+                    <strong>
+                      {sequenceHistoryLength
+                        ? `${sequenceHistoryLength} visits`
+                        : "No history"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Sequence score</span>
+                    <strong>
+                      {sequenceScore === null
+                        ? "N/A"
+                        : Number(sequenceScore).toFixed(4)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Sequence blend</span>
+                    <strong>
+                      {sequenceScoreNormalized === null
+                        ? "N/A"
+                        : Number(sequenceScoreNormalized).toFixed(4)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Trend drift</span>
+                    <strong>{driftAlarm ? "Shift detected" : "Stable"}</strong>
+                  </div>
+                  <div>
+                    <span>Drift method</span>
+                    <strong>{driftMethod}</strong>
+                  </div>
+                </div>
+                <p className="model-hub-focus__copy">
+                  {primaryModel?.name || "The primary model"} is the strongest
+                  single detector in the current catalog, while{" "}
+                  {activeModel?.variantLabel || "the trained model"} remains the
+                  current selection.
+                </p>
+                <div className="callout callout--soft">
+                  <strong>Conformal assessment</strong>
+                  <p>{conformalAssessment}</p>
+                </div>
               </div>
-              <div className="model-hub-focus__metrics">
-                <div>
-                  <span>Primary model</span>
-                  <strong>{primaryModel?.name || "N/A"}</strong>
-                </div>
-                <div>
-                  <span>Rank</span>
-                  <strong>{activeModelRank || "N/A"}</strong>
-                </div>
-                <div>
-                  <span>F1</span>
-                  <strong>{activeModel ? `${Math.round((activeModel.f1 ?? activeModel.score ?? 0) * 100)}%` : "N/A"}</strong>
-                </div>
-                <div>
-                  <span>Latency</span>
-                  <strong>{activeModel?.latencyMs ?? "N/A"} ms</strong>
-                </div>
-                <div>
-                  <span>Memory</span>
-                  <strong>{activeModel?.memoryMb ?? "N/A"} MB</strong>
-                </div>
-                <div>
-                  <span>Conformal p-value</span>
-                  <strong>{conformalPValue === null ? "N/A" : conformalPValue.toFixed(4)}</strong>
-                </div>
-                <div>
-                  <span>Verdict</span>
-                  <strong>{conformalStatusLabel}</strong>
-                </div>
-                <div>
-                  <span>Visit sequence</span>
-                  <strong>{sequenceHistoryLength ? `${sequenceHistoryLength} visits` : "No history"}</strong>
-                </div>
-                <div>
-                  <span>Sequence score</span>
-                  <strong>{sequenceScore === null ? "N/A" : Number(sequenceScore).toFixed(4)}</strong>
-                </div>
-                <div>
-                  <span>Sequence blend</span>
-                  <strong>{sequenceScoreNormalized === null ? "N/A" : Number(sequenceScoreNormalized).toFixed(4)}</strong>
-                </div>
-                <div>
-                  <span>Trend drift</span>
-                  <strong>{driftAlarm ? "Shift detected" : "Stable"}</strong>
-                </div>
-                <div>
-                  <span>Drift method</span>
-                  <strong>{driftMethod}</strong>
-                </div>
-              </div>
-              <p className="model-hub-focus__copy">
-                {primaryModel?.name || "The primary model"} is the strongest single detector in the current catalog, while {activeModel?.variantLabel || "the trained model"} remains the current selection.
-              </p>
-              <div className="callout callout--soft">
-                <strong>Conformal assessment</strong>
-                <p>{conformalAssessment}</p>
-              </div>
-            </div>
-          </section>
+            </section>
           ) : null}
 
           {false ? (
-          <AnalysisSection
-            unlocked={true}
-            eyebrow="Drift"
-            title="Score stream change point"
-            description="This compact stream view marks where the score trend shifts away from the patient baseline."
-          >
-            <ScoreStreamDriftChart
-              stream={Array.isArray(modelResults.backendPrediction?.prediction?.score_stream) ? modelResults.backendPrediction.prediction.score_stream : []}
-              fallbackSeries={modelResults.trendSeries || []}
-              driftIndex={driftAlarm ? modelResults.backendPrediction?.prediction?.score_stream_drift_change_index : null}
-              loading={false}
-              driftActive={driftAlarm}
-              driftMethod={driftMethod}
-            />
-          </AnalysisSection>
+            <AnalysisSection
+              unlocked={true}
+              eyebrow="Drift"
+              title="Score stream change point"
+              description="This compact stream view marks where the score trend shifts away from the patient baseline."
+            >
+              <ScoreStreamDriftChart
+                stream={
+                  Array.isArray(
+                    modelResults.backendPrediction?.prediction?.score_stream,
+                  )
+                    ? modelResults.backendPrediction.prediction.score_stream
+                    : []
+                }
+                fallbackSeries={modelResults.trendSeries || []}
+                driftIndex={
+                  driftAlarm
+                    ? modelResults.backendPrediction?.prediction
+                        ?.score_stream_drift_change_index
+                    : null
+                }
+                loading={false}
+                driftActive={driftAlarm}
+                driftMethod={driftMethod}
+              />
+            </AnalysisSection>
           ) : null}
 
           <AnalysisSection
@@ -7123,7 +9136,13 @@ function ModelAnalyticalHubPage() {
             <ResidualHeatmapCard heatmap={residualHeatmap} loading={false} />
           </AnalysisSection>
 
-          {false ? <ModelHubExplainabilityCard activeModel={activeModel} primaryModel={primaryModel} modelResults={modelResults} /> : null}
+          {false ? (
+            <ModelHubExplainabilityCard
+              activeModel={activeModel}
+              primaryModel={primaryModel}
+              modelResults={modelResults}
+            />
+          ) : null}
         </div>
       }
       right={
@@ -7152,25 +9171,26 @@ function ModelAnalyticalHubPage() {
           />
 
           {false ? (
-          <section className="model-hub-notes">
-            <div className="callout callout--accent">
-              <strong>Hub summary</strong>
-              <p>
-                The model hub now lists every trained model, separates ML from DL families, and keeps the active model
-                pinned to the current review state.
-              </p>
-            </div>
-            <div className="mini-metrics">
-              <div>
-                <span>Families</span>
-                <strong>2</strong>
+            <section className="model-hub-notes">
+              <div className="callout callout--accent">
+                <strong>Hub summary</strong>
+                <p>
+                  The model hub now lists every trained model, separates ML from
+                  DL families, and keeps the active model pinned to the current
+                  review state.
+                </p>
               </div>
-              <div>
-                <span>Total models</span>
-                <strong>{hubGroups.allCount}</strong>
+              <div className="mini-metrics">
+                <div>
+                  <span>Families</span>
+                  <strong>2</strong>
+                </div>
+                <div>
+                  <span>Total models</span>
+                  <strong>{hubGroups.allCount}</strong>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
           ) : null}
         </div>
       }
@@ -7192,13 +9212,22 @@ const router = createBrowserRouter([
       {
         element: <StepGuard />,
         children: [
-        { path: "patient-details", element: <PatientDetailsPage /> },
-        { path: "lab-investigation", element: <LabInvestigationPage /> },
-        { path: "patient-care-insights", element: <PatientCareInsightsPage /> },
-        { path: "comparative-analysis", element: <ComparativeAnalysisPage /> },
-        { path: "decision-support", element: <DecisionSupportPage /> },
-        { path: "backend-processing", element: <Navigate to="/model-analytical-hub" replace /> },
-        { path: "model-analytical-hub", element: <ModelAnalyticalHubPage /> },
+          { path: "patient-details", element: <PatientDetailsPage /> },
+          { path: "lab-investigation", element: <LabInvestigationPage /> },
+          {
+            path: "patient-care-insights",
+            element: <PatientCareInsightsPage />,
+          },
+          {
+            path: "comparative-analysis",
+            element: <ComparativeAnalysisPage />,
+          },
+          { path: "decision-support", element: <DecisionSupportPage /> },
+          {
+            path: "backend-processing",
+            element: <Navigate to="/model-analytical-hub" replace />,
+          },
+          { path: "model-analytical-hub", element: <ModelAnalyticalHubPage /> },
         ],
       },
     ],
