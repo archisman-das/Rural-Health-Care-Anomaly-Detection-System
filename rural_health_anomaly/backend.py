@@ -15,7 +15,6 @@ from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile, s
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from .feedback import append_feedback_records
 from .training import load_pipeline, score_records
@@ -962,11 +961,16 @@ def create_app(
     frontend_dist = Path(os.getenv("FRONTEND_DIST_DIR", "/app/web/dist"))
     frontend_index = frontend_dist / "index.html"
     if frontend_index.exists():
-        @app.get("/")
-        def root() -> FileResponse:
+        @app.get("/{full_path:path}")
+        def frontend_fallback(full_path: str) -> FileResponse:
+            requested = (frontend_dist / full_path).resolve()
+            try:
+                requested.relative_to(frontend_dist.resolve())
+            except ValueError:
+                return FileResponse(frontend_index)
+            if requested.is_file():
+                return FileResponse(requested)
             return FileResponse(frontend_index)
-
-        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 
     return app
 
