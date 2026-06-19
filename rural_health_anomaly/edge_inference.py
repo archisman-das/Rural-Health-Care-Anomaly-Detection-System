@@ -13,7 +13,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from .training import _clinical_risk_component, _risk_category_from_score, load_tabular_data
+from .training import _clinical_risk_assessment, _risk_category_from_score, load_tabular_data
 
 
 @dataclass(frozen=True)
@@ -244,14 +244,20 @@ def score_bundle_frame(bundle: EdgeBundle, data: pd.DataFrame) -> pd.DataFrame:
     output["raw_anomaly_score"] = fused_score
     output["anomaly_score"] = fused_score
     risk_scoring_weights = bundle.manifest.get("risk_scoring_weights", {})
-    output["clinical_risk_score"] = output.apply(
-        lambda row: _clinical_risk_component(row, anomaly_score=float(row["anomaly_score"]), weights=risk_scoring_weights),
+    risk_assessment = output.apply(
+        lambda row: _clinical_risk_assessment(
+            row,
+            anomaly_score=float(row["anomaly_score"]),
+            weights=risk_scoring_weights,
+        ),
         axis=1,
+        result_type="expand",
     )
-    output["risk_score"] = output["clinical_risk_score"]
-    output["risk_category"] = output["risk_score"].apply(lambda value: _risk_category_from_score(float(value) / 100.0))
+    output = pd.concat([output, risk_assessment], axis=1)
+    output["clinical_risk_score"] = output["risk_score"]
+    output["risk_category"] = output["risk_score_normalized"].apply(lambda value: _risk_category_from_score(float(value)))
     output["risk_level"] = output["risk_category"]
-    output["alert_triggered"] = output["risk_category"].isin(["High", "Critical"])
+    output["alert_triggered"] = output["risk_category"].eq("High")
     output["decision_margin"] = decision_margin
     output["anomaly_flag"] = np.where(decision_margin >= 0.0, 1, -1)
     output["is_anomaly"] = output["anomaly_flag"] == -1

@@ -5546,12 +5546,230 @@ function deviationFromRange(value, min, max) {
   return clamp01((numeric - max) / Math.max(max, 1));
 }
 
+function normalizeClinicalToken(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitClinicalList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  return String(value ?? "")
+    .split(/[,;\n\/|]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function assessClinicalRisk(patient) {
+  const medicalHistory = patient.medicalHistory || {};
+  const measurements = patient.measurements || {};
+  const labs = patient.labs || {};
+
+  const noneTokens = new Set([
+    "none of the above",
+    "none",
+    "no known conditions",
+    "no comorbidities",
+    "nil",
+    "n/a",
+  ]);
+  const highRiskTokens = new Set([
+    "ckd",
+    "chronic kidney disease",
+    "kidney disease",
+    "renal disease",
+    "renal failure",
+    "coronary artery disease",
+    "cad",
+    "coronary heart disease",
+    "ischemic heart disease",
+    "type 2 diabetes",
+    "type ii diabetes",
+    "type 2 dm",
+    "t2d",
+    "hypertension",
+    "htn",
+    "high blood pressure",
+    "copd",
+    "chronic obstructive pulmonary disease",
+  ]);
+  const moderateTokens = new Set([
+    "obesity",
+    "hyperlipidemia",
+    "dyslipidemia",
+    "asthma",
+    "depression",
+    "depressive disorder",
+    "osteoarthritis",
+  ]);
+
+  const activeComorbidities = splitClinicalList(medicalHistory.comorbidities)
+    .filter((item) => {
+      const normalized = normalizeClinicalToken(item);
+      return normalized && !noneTokens.has(normalized);
+    })
+    .filter(
+      (item, index, items) =>
+        items.findIndex(
+          (entry) => normalizeClinicalToken(entry) === normalizeClinicalToken(item),
+        ) === index,
+    );
+  const highRiskComorbidities = activeComorbidities.filter((item) =>
+    highRiskTokens.has(normalizeClinicalToken(item)),
+  );
+  const moderateComorbidities = activeComorbidities.filter((item) =>
+    moderateTokens.has(normalizeClinicalToken(item)),
+  );
+
+  const glucosePoc = parseNumeric(
+    measurements.bloodGlucose || labs.bloodGlucose || labs.glucose || 0,
+  );
+  const glucoseFasting = parseNumeric(labs.fastingGlucose || 0);
+  const glucosePostprandial = parseNumeric(labs.postprandialGlucose || 0);
+  const hba1c = parseNumeric(labs.hba1c || 0);
+  const creatinine = parseNumeric(labs.creatinine || 0);
+  const urea = parseNumeric(labs.urea || 0);
+  const systolicBp = parseNumeric(measurements.systolicBp || 0);
+  const spo2 = parseNumeric(measurements.spo2 || 0);
+
+  const glucoseCandidates = [glucosePoc, glucoseFasting].filter((value) => value > 0);
+  const glucoseForScoring = glucoseCandidates.length
+    ? Math.max(...glucoseCandidates)
+    : 0;
+
+  const criticalReasons = [];
+  if (glucoseForScoring && (glucoseForScoring < 50 || glucoseForScoring > 400)) {
+    criticalReasons.push(`Blood glucose ${glucoseForScoring.toFixed(1)} mg/dL`);
+  }
+  if (creatinine > 2.0) {
+    criticalReasons.push(`Creatinine ${creatinine.toFixed(1)} mg/dL`);
+  }
+  if (urea > 40.0) {
+    criticalReasons.push(`Urea/BUN ${urea.toFixed(1)} mg/dL`);
+  }
+  if (systolicBp && (systolicBp > 180 || systolicBp < 80)) {
+    criticalReasons.push(`Systolic BP ${systolicBp.toFixed(0)} mmHg`);
+  }
+  if (spo2 && spo2 < 90) {
+    criticalReasons.push(`SpO2 ${spo2.toFixed(0)}%`);
+  }
+  if (hba1c > 9.0) {
+    criticalReasons.push(`HbA1c ${hba1c.toFixed(1)}%`);
+  }
+
+  const criticalOverrideTriggered = criticalReasons.length > 0;
+  const t2dPresent = activeComorbidities.some((item) =>
+    ["type 2 diabetes", "type ii diabetes", "type 2 dm", "t2d"].includes(
+      normalizeClinicalToken(item),
+    ),
+  );
+  const diabetesInconsistency = Boolean(t2dPresent && hba1c > 0 && hba1c < 6.0);
+
+  const totalDeviation = [
+    deviationFromRange(glucoseForScoring || labs.fastingGlucose, 70, 99),
+    deviationFromRange(glucosePostprandial, 0, 140),
+    deviationFromRange(hba1c, 4.0, 5.6),
+    deviationFromRange(parseNumeric(labs.hemoglobin), 12.0, 17.5),
+    deviationFromRange(parseNumeric(labs.wbcCount), 4.0, 11.0),
+    deviationFromRange(parseNumeric(labs.plateletCount), 150, 450),
+    deviationFromRange(parseNumeric(labs.ldl), 0, 100),
+    deviationFromRange(parseNumeric(labs.hdl), 40, Infinity),
+    deviationFromRange(parseNumeric(labs.triglycerides), 0, 150),
+    deviationFromRange(parseNumeric(labs.ast), 10, 40),
+    deviationFromRange(parseNumeric(labs.alt), 7, 56),
+    deviationFromRange(parseNumeric(labs.bilirubin), 0.1, 1.2),
+    deviationFromRange(parseNumeric(labs.albumin), 3.5, 5.0),
+    deviationFromRange(creatinine, 0.6, 1.3),
+    deviationFromRange(urea, 7, 20),
+    deviationFromRange(parseNumeric(labs.egfr), 90, Infinity),
+    deviationFromRange(parseNumeric(labs.sodium), 135, 145),
+    deviationFromRange(parseNumeric(labs.potassium), 3.5, 5.1),
+    deviationFromRange(parseNumeric(labs.chloride), 98, 107),
+    deviationFromRange(parseNumeric(labs.bicarbonate), 22, 29),
+    deviationFromRange(measurements.spo2, 95, 100),
+    deviationFromRange(measurements.temperature, 36.1, 37.2),
+    deviationFromRange(measurements.heartRate, 60, 100),
+    deviationFromRange(measurements.systolicBp, 90, 140),
+    deviationFromRange(measurements.diastolicBp, 60, 90),
+  ].reduce((sum, value) => sum + value, 0);
+
+  const baseScore = clamp01(0.22 + totalDeviation / 18);
+  const comorbidityBoost = Math.min(
+    highRiskComorbidities.length * 0.08 + moderateComorbidities.length * 0.04,
+    0.4,
+  );
+  let floor = 0;
+  if (activeComorbidities.length >= 8) {
+    floor = 0.65;
+  } else if (activeComorbidities.length >= 5) {
+    floor = 0.55;
+  } else if (activeComorbidities.length >= 3) {
+    floor = 0.4;
+  }
+  if (criticalOverrideTriggered) {
+    floor = Math.max(floor, 0.75);
+  }
+
+  const normalizedScore = clamp01(Math.max(baseScore + comorbidityBoost, floor));
+  const riskLevel =
+    normalizedScore >= 0.65 ? "High" : normalizedScore >= 0.4 ? "Medium" : "Low";
+  const warnings = [];
+  if (
+    glucosePoc > 0 &&
+    glucoseFasting > 0 &&
+    Math.abs(glucosePoc - glucoseFasting) > 50
+  ) {
+    warnings.push(
+      `Glucose conflict detected: POC glucose ${glucosePoc.toFixed(1)} mg/dL and fasting glucose ${glucoseFasting.toFixed(1)} mg/dL differ by more than 50 mg/dL; higher value used.`,
+    );
+  }
+  if (diabetesInconsistency) {
+    warnings.push(
+      `Clinical inconsistency detected: Type 2 Diabetes is present but HbA1c is ${hba1c.toFixed(1)}%, so the low HbA1c was not allowed to reduce risk.`,
+    );
+  }
+  if (criticalOverrideTriggered) {
+    warnings.push(`Critical value override triggered: ${criticalReasons.join("; ")}.`);
+  }
+
+  const riskSummaryParts = [
+    `Base blended score: ${baseScore.toFixed(2)}.`,
+    `Comorbidity boost: +${comorbidityBoost.toFixed(2)} from ${highRiskComorbidities.length} high-risk and ${moderateComorbidities.length} moderate conditions.`,
+    `Minimum floor: ${floor.toFixed(2)}.`,
+  ];
+  if (criticalOverrideTriggered) {
+    riskSummaryParts.push(
+      `Critical override applied because ${criticalReasons.join("; ")}.`,
+    );
+  }
+  if (warnings.length) {
+    riskSummaryParts.push(`Warnings: ${warnings.join(" | ")}`);
+  }
+
+  return {
+    overallScore: normalizedScore,
+    riskLevel,
+    riskSummary: riskSummaryParts.join(" "),
+    riskWarnings: warnings,
+    criticalOverrideTriggered,
+    criticalReasons,
+    comorbidityCount: activeComorbidities.length,
+    highRiskComorbidityCount: highRiskComorbidities.length,
+    moderateComorbidityCount: moderateComorbidities.length,
+  };
+}
+
 function computeAnalysisResults(patient, priorHistory = []) {
   const labs = patient.labs;
   const measurements = patient.measurements;
+  const clinicalRisk = assessClinicalRisk(patient);
 
   const severitySignals = [
-    deviationFromRange(labs.fastingGlucose, 70, 99),
+    deviationFromRange(parseNumeric(labs.fastingGlucose || measurements.bloodGlucose), 70, 99),
     deviationFromRange(labs.postprandialGlucose, 0, 140),
     deviationFromRange(labs.hba1c, 4.0, 5.6),
     deviationFromRange(labs.hemoglobin, 12.0, 17.5),
@@ -5579,9 +5797,9 @@ function computeAnalysisResults(patient, priorHistory = []) {
   ];
 
   const totalDeviation = severitySignals.reduce((sum, value) => sum + value, 0);
-  const overallScore = clamp01(0.22 + totalDeviation / 18);
-  const riskLevel =
-    overallScore >= 0.7 ? "High" : overallScore >= 0.4 ? "Medium" : "Low";
+  const calculatedScore = clamp01(0.22 + totalDeviation / 18);
+  const overallScore = Math.max(calculatedScore, clinicalRisk.overallScore);
+  const riskLevel = clinicalRisk.riskLevel;
   const primaryModel = analysisModelCatalog.reduce(
     (best, model) => (model.f1 > best.f1 ? model : best),
     analysisModelCatalog[0],
@@ -5683,6 +5901,7 @@ function computeAnalysisResults(patient, priorHistory = []) {
     `${primaryModel.name} remains the strongest single detector by F1.`,
     `${riskLevel} risk band unlocked after the test run.`,
     `${featureAttributions[0].feature} and ${featureAttributions[1].feature} are the strongest drivers.`,
+    clinicalRisk.riskSummary,
   ];
 
   const trendBase = clamp(overallScore, 0.05, 0.98);
@@ -5835,6 +6054,9 @@ function computeAnalysisResults(patient, priorHistory = []) {
     },
     progression,
     summaryPoints,
+    riskSummary: clinicalRisk.riskSummary,
+    riskWarnings: clinicalRisk.riskWarnings,
+    criticalOverrideTriggered: clinicalRisk.criticalOverrideTriggered,
   };
 }
 
@@ -6248,7 +6470,7 @@ function buildFallbackLatentManifold(models, activeModel, primaryModel) {
   const selectedKey =
     activeModel?.key || primaryModel?.key || ranked[0]?.key || null;
 
-  const points = ranked.slice(0, 12).map((model, index) => {
+  const points = ranked.map((model, index) => {
     const familyBoost = model.family === "DL" ? 0.08 : -0.08;
     const scoreOffset = 0.5 - model.score;
     const angle = (index / Math.max(ranked.length, 1)) * Math.PI * 2;
@@ -6333,7 +6555,7 @@ function buildFallbackReconstructionResidualHeatmap(models, activeModel) {
     0,
   );
 
-  const modelsWithRows = ranked.slice(0, 6).map((model, index) => {
+  const modelsWithRows = ranked.map((model, index) => {
     const score = clamp01(
       Number(model.f1 ?? model.score ?? model.accuracy ?? 0),
     );
@@ -7028,7 +7250,7 @@ function PatientDetailsPage() {
             <SectionCard
               eyebrow="Clinical measurements"
               title="Vitals and anthropometrics"
-              description="Measure the patient now. BMI is calculated from weight and height."
+              description="Measure the patient now. BMI is calculated from weight and height, and the inline help shows the usual reference range for each field."
             >
               <div className="measurement-summary">
                 <NumberSummary label="BMI" value={bmi} suffix="" />
@@ -7062,7 +7284,7 @@ function PatientDetailsPage() {
                   />
                   {renderFieldHelp(
                     "bpm",
-                    "Enter the latest measured pulse from the vitals check.",
+                    "Normal adult range is about 60 to 100 bpm.",
                   )}
                 </label>
                 <label>
@@ -7083,7 +7305,7 @@ function PatientDetailsPage() {
                   />
                   {renderFieldHelp(
                     "mmHg",
-                    "Use the upper blood pressure number from the reading.",
+                    "Usual adult range is about 90 to 120 mmHg.",
                   )}
                 </label>
                 <label>
@@ -7104,7 +7326,7 @@ function PatientDetailsPage() {
                   />
                   {renderFieldHelp(
                     "mmHg",
-                    "Use the lower blood pressure number from the reading.",
+                    "Usual adult range is about 60 to 80 mmHg.",
                   )}
                 </label>
                 <label>
@@ -7123,7 +7345,7 @@ function PatientDetailsPage() {
                   />
                   {renderFieldHelp(
                     "%",
-                    "Use the most recent oxygen saturation value.",
+                    "Normal oxygen saturation is usually 95 to 100%.",
                   )}
                 </label>
                 <label>
@@ -7145,7 +7367,7 @@ function PatientDetailsPage() {
                   />
                   {renderFieldHelp(
                     "°C",
-                    "Enter the current temperature measurement.",
+                    "Normal adult temperature is about 36.1 to 37.2 C.",
                   )}
                 </label>
                 <label>
@@ -7166,7 +7388,7 @@ function PatientDetailsPage() {
                   />
                   {renderFieldHelp(
                     "breaths/min",
-                    "Use the latest breathing rate from the chart or note.",
+                    "Normal adult respiratory rate is about 12 to 20 breaths/min.",
                   )}
                 </label>
                 <label>
@@ -7180,6 +7402,10 @@ function PatientDetailsPage() {
                     }
                     placeholder="Type weight in kg"
                   />
+                  {renderFieldHelp(
+                    "kg",
+                    "Use the measured value; BMI is the main reference metric.",
+                  )}
                 </label>
                 <label>
                   <span>Height (cm)</span>
@@ -7192,14 +7418,21 @@ function PatientDetailsPage() {
                     }
                     placeholder="Type height in cm"
                   />
+                  {renderFieldHelp(
+                    "cm",
+                    "Use the measured value; BMI is the main reference metric.",
+                  )}
                 </label>
               </TwoColumnFields>
+              <div className="section-card__description">
+                Typical adult BMI is 18.5 to 24.9 kg/m2.
+              </div>
             </SectionCard>
 
             <SectionCard
               eyebrow="Point-of-care labs"
               title="Mandatory bedside labs"
-              description="These lab values are required on Step 1 so the intake stays complete."
+              description="These mandatory bedside labs are required on Step 1 so the intake stays complete."
             >
               <TwoColumnFields>
                 <label>
@@ -7219,7 +7452,7 @@ function PatientDetailsPage() {
                   />
                   {renderFieldHelp(
                     "g/dL",
-                    "Use the reported hemoglobin value from the lab note.",
+                    "Normal adult hemoglobin is about 12.0 to 17.5 g/dL.",
                   )}
                 </label>
                 <label>
@@ -7239,10 +7472,13 @@ function PatientDetailsPage() {
                   />
                   {renderFieldHelp(
                     "mg/dL",
-                    "Use the glucose value shown in the record.",
+                    "Normal fasting glucose is about 70 to 99 mg/dL; random glucose is usually below 140 mg/dL.",
                   )}
                 </label>
               </TwoColumnFields>
+              <div className="section-card__description">
+                Mandatory bedside labs: hemoglobin and blood glucose.
+              </div>
             </SectionCard>
             <div className="back-to-top-wrap">
               <button
@@ -8364,6 +8600,12 @@ function DecisionSupportPage() {
                 <strong>{analysisReady ? modelResults.status : "Idle"}</strong>
               </div>
             </div>
+            {analysisReady && modelResults.riskSummary ? (
+              <div className="callout callout--soft">
+                <strong>Why this score</strong>
+                <p>{modelResults.riskSummary}</p>
+              </div>
+            ) : null}
             <div className="callout callout--soft">
               <strong>Conformal verdict</strong>
               <p>{resolvedConformalAssessment}</p>
@@ -8863,9 +9105,7 @@ function ModelAnalyticalHubPage() {
   const step = flowSteps[6];
   const hubGroups = React.useMemo(() => {
     const groups = getModelHubGroups();
-    const isVisible = (model) =>
-      model.key !== "anomaly-transformer" &&
-      model.name !== "Anomaly Transformer";
+    const isVisible = (model) => !model.hidden;
     const catalog = groups.catalog.filter(isVisible);
     return {
       ...groups,
@@ -8927,9 +9167,26 @@ function ModelAnalyticalHubPage() {
     [hubGroups.catalog],
   );
   const latentManifold = React.useMemo(
-    () =>
-      modelResults.backendPrediction?.latent_manifold ||
-      buildFallbackLatentManifold(hubGroups.catalog, activeModel, primaryModel),
+    () => {
+      const fallbackManifold = buildFallbackLatentManifold(
+        hubGroups.catalog,
+        activeModel,
+        primaryModel,
+      );
+      const backendManifold = modelResults.backendPrediction?.latent_manifold || null;
+      const normalizedBackend = normalizeLatentManifold(backendManifold);
+
+      if (
+        !normalizedBackend ||
+        normalizedBackend.pointCount < hubGroups.catalog.length ||
+        !Number.isFinite(normalizedBackend.deepSvdd.radius) ||
+        normalizedBackend.points.length < 2
+      ) {
+        return fallbackManifold;
+      }
+
+      return backendManifold;
+    },
     [
       activeModel,
       hubGroups.catalog,
@@ -8938,12 +9195,26 @@ function ModelAnalyticalHubPage() {
     ],
   );
   const residualHeatmap = React.useMemo(
-    () =>
-      modelResults.backendPrediction?.reconstruction_residual_heatmap ||
-      buildFallbackReconstructionResidualHeatmap(
+    () => {
+      const fallbackHeatmap = buildFallbackReconstructionResidualHeatmap(
         hubGroups.catalog,
         activeModel,
-      ),
+      );
+      const backendHeatmap =
+        modelResults.backendPrediction?.reconstruction_residual_heatmap || null;
+      const normalizedBackend = normalizeReconstructionResidualHeatmap(
+        backendHeatmap,
+      );
+
+      if (
+        !normalizedBackend ||
+        normalizedBackend.models.length < hubGroups.catalog.length
+      ) {
+        return fallbackHeatmap;
+      }
+
+      return backendHeatmap;
+    },
     [activeModel, hubGroups.catalog, modelResults.backendPrediction],
   );
 

@@ -10,7 +10,14 @@ import pandas as pd
 
 from rural_health_anomaly.cli import run_predict, run_retrain_feedback, run_split_data, run_train
 from rural_health_anomaly.example import build_large_training_data
-from rural_health_anomaly.training import _clinical_risk_component, _generate_risk_score, _risk_category_from_score, load_pipeline, score_records
+from rural_health_anomaly.training import (
+    _clinical_risk_assessment,
+    _clinical_risk_component,
+    _generate_risk_score,
+    _risk_category_from_score,
+    load_pipeline,
+    score_records,
+)
 
 
 class CliTrainingAndArtifactTests(unittest.TestCase):
@@ -284,14 +291,34 @@ class CliTrainingAndArtifactTests(unittest.TestCase):
             self.assertEqual(len(scored), 2)
 
     def test_predict_cli_assigns_risk_categories_from_score_thresholds(self):
-        self.assertEqual(_risk_category_from_score(0.0), "Normal")
-        self.assertEqual(_risk_category_from_score(0.29), "Normal")
-        self.assertEqual(_risk_category_from_score(0.3), "Moderate")
-        self.assertEqual(_risk_category_from_score(0.59), "Moderate")
-        self.assertEqual(_risk_category_from_score(0.6), "High")
-        self.assertEqual(_risk_category_from_score(0.84), "High")
-        self.assertEqual(_risk_category_from_score(0.85), "Critical")
-        self.assertEqual(_risk_category_from_score(1.0), "Critical")
+        self.assertEqual(_risk_category_from_score(0.0), "Low")
+        self.assertEqual(_risk_category_from_score(0.39), "Low")
+        self.assertEqual(_risk_category_from_score(0.4), "Medium")
+        self.assertEqual(_risk_category_from_score(0.64), "Medium")
+        self.assertEqual(_risk_category_from_score(0.65), "High")
+        self.assertEqual(_risk_category_from_score(0.99), "High")
+
+    def test_clinical_risk_assessment_applies_critical_override(self):
+        row = {
+            "anomaly_score": 0.1,
+            "glucose_fasting_mg_dl": 425,
+            "medicalHistory.comorbidities": "Type 2 Diabetes",
+        }
+        assessment = _clinical_risk_assessment(row, anomaly_score=0.1)
+        self.assertGreaterEqual(assessment["risk_score_normalized"], 0.75)
+        self.assertEqual(assessment["risk_category"], "High")
+        self.assertTrue(assessment["critical_override_triggered"])
+        self.assertTrue(any("Blood glucose" in warning for warning in assessment["risk_warnings"]))
+
+    def test_clinical_risk_assessment_applies_comorbidity_floor(self):
+        row = {
+            "anomaly_score": 0.05,
+            "medicalHistory.comorbidities": "Hypertension, Type 2 Diabetes, COPD, Obesity, Asthma",
+        }
+        assessment = _clinical_risk_assessment(row, anomaly_score=0.05)
+        self.assertGreaterEqual(assessment["risk_score_normalized"], 0.55)
+        self.assertEqual(assessment["risk_category"], "Medium")
+        self.assertEqual(assessment["comorbidity_count"], 5)
 
     def test_generate_risk_score_scales_to_percentage(self):
         self.assertEqual(_generate_risk_score(0.0), 0.0)

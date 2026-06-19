@@ -41,6 +41,45 @@ _DEFAULT_RISK_SCORING_WEIGHTS = {
     "labs": 0.30,
     "access": 0.15,
 }
+_RISK_CATEGORY_LOW_MAX = 0.40
+_RISK_CATEGORY_MEDIUM_MAX = 0.65
+_HIGH_RISK_COMORBIDITIES = {
+    "ckd",
+    "chronic kidney disease",
+    "kidney disease",
+    "renal disease",
+    "renal failure",
+    "coronary artery disease",
+    "cad",
+    "coronary heart disease",
+    "ischemic heart disease",
+    "type 2 diabetes",
+    "type ii diabetes",
+    "type 2 dm",
+    "t2d",
+    "hypertension",
+    "htn",
+    "high blood pressure",
+    "copd",
+    "chronic obstructive pulmonary disease",
+}
+_MODERATE_COMORBIDITIES = {
+    "obesity",
+    "hyperlipidemia",
+    "dyslipidemia",
+    "asthma",
+    "depression",
+    "depressive disorder",
+    "osteoarthritis",
+}
+_NONE_COMORBIDITY_TOKENS = {
+    "none of the above",
+    "none",
+    "no known conditions",
+    "no comorbidities",
+    "nil",
+    "n/a",
+}
 _CONFORMAL_ALPHA = 0.05
 _CONFORMAL_RECONSTRUCTION_COMPONENTS = (
     "autoencoder",
@@ -54,15 +93,14 @@ _SPLIT_FILENAMES = ("data.csv", "data.parquet")
 
 
 def _risk_category_from_score(score: float) -> str:
-    """Map a normalized anomaly score to a clinical risk category."""
+    """Map a normalized clinical risk score to a clinical risk category."""
 
-    if score < 0.3:
-        return "Normal"
-    if score < 0.6:
-        return "Moderate"
-    if score < 0.85:
-        return "High"
-    return "Critical"
+    normalized = _clamp_unit_interval(score, default=0.0) or 0.0
+    if normalized < _RISK_CATEGORY_LOW_MAX:
+        return "Low"
+    if normalized < _RISK_CATEGORY_MEDIUM_MAX:
+        return "Medium"
+    return "High"
 
 
 def _generate_risk_score(score: float) -> float:
@@ -130,13 +168,107 @@ def _parse_trend_days(value: Any) -> float | None:
     return _mean_present(numbers)
 
 
-def _clinical_risk_component(
+def _normalize_comorbidity_token(value: Any) -> str:
+    text = re.sub(r"[^a-z0-9]+", " ", str(value).lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _split_comorbidity_values(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, float) and pd.isna(value):
+        return []
+    if isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = re.split(r"[,\n;/|]+", str(value))
+    return [str(item).strip() for item in raw_values if str(item).strip()]
+
+
+def _get_nested_row_value(row: pd.Series | dict[str, Any], *path: str) -> Any:
+    current: Any = row
+    for key in path:
+        if isinstance(current, pd.Series):
+            current = current.get(key)
+        elif isinstance(current, dict):
+            current = current.get(key)
+        else:
+            return None
+        if current is None:
+            return None
+        if isinstance(current, float) and pd.isna(current):
+            return None
+    return current
+
+
+def _pick_row_value(row: pd.Series | dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if isinstance(row, pd.Series) and key in row.index:
+            value = row[key]
+            if value is not None and not (isinstance(value, float) and pd.isna(value)):
+                return value
+        elif isinstance(row, dict) and key in row:
+            value = row[key]
+            if value is not None and not (isinstance(value, float) and pd.isna(value)):
+                return value
+        if "." in key:
+            value = _get_nested_row_value(row, *key.split("."))
+        else:
+            value = _get_nested_row_value(row, key)
+        if value is not None:
+            return value
+    return None
+
+
+def _pick_float_value(row: pd.Series | dict[str, Any], *keys: str) -> float | None:
+    for key in keys:
+        value = _pick_row_value(row, key)
+        numeric = _safe_float(value)
+        if numeric is not None:
+            return numeric
+    return None
+
+
+def _collect_comorbidities(row: pd.Series | dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
+    raw_value = _pick_row_value(
+        row,
+        "medicalHistory.comorbidities",
+        "medical_history.comorbidities",
+        "medicalHistory_comorbidities",
+        "medical_history_comorbidities",
+        "comorbidities",
+    )
+    tokens = _split_comorbidity_values(raw_value)
+    active_tokens: list[str] = []
+    seen_tokens: set[str] = set()
+    for token in tokens:
+        normalized = _normalize_comorbidity_token(token)
+        if not normalized or normalized in _NONE_COMORBIDITY_TOKENS:
+            continue
+        if normalized in seen_tokens:
+            continue
+        seen_tokens.add(normalized)
+        active_tokens.append(token.strip())
+
+    high_risk_matches: list[str] = []
+    moderate_matches: list[str] = []
+    for token in active_tokens:
+        normalized = _normalize_comorbidity_token(token)
+        if normalized in _HIGH_RISK_COMORBIDITIES:
+            high_risk_matches.append(token)
+        elif normalized in _MODERATE_COMORBIDITIES:
+            moderate_matches.append(token)
+
+    return active_tokens, high_risk_matches, moderate_matches
+
+
+def _clinical_risk_assessment(
     row: pd.Series | dict[str, Any],
     *,
     anomaly_score: float,
     weights: dict[str, float] | None = None,
-) -> float:
-    """Blend anomaly output with vitals, labs, and access barriers."""
+) -> dict[str, Any]:
+    """Blend anomaly output with clinical overrides, floors, and explanations."""
 
     resolved_weights = _resolve_risk_scoring_weights(weights)
     anomaly_weight = resolved_weights["anomaly"]
@@ -145,35 +277,84 @@ def _clinical_risk_component(
     access_weight = resolved_weights["access"]
 
     def pick(*keys: str) -> Any:
-        for key in keys:
-            if isinstance(row, pd.Series):
-                if key in row.index:
-                    value = row[key]
-                    if value is None:
-                        continue
-                    if isinstance(value, float) and pd.isna(value):
-                        continue
-                    return value
-            else:
-                value = row.get(key)
-                if value is not None and not (isinstance(value, float) and pd.isna(value)):
-                    return value
-        return None
+        return _pick_row_value(row, *keys)
 
-    vitals = _mean_present([
+    active_comorbidities, high_risk_comorbidities, moderate_comorbidities = _collect_comorbidities(row)
+    active_comorbidity_count = len(active_comorbidities)
+    high_risk_comorbidity_count = len(high_risk_comorbidities)
+    moderate_comorbidity_count = len(moderate_comorbidities)
+
+    glucose_poc = _pick_float_value(
+        row,
+        "glucose_poc_mg_dl",
+        "poc_glucose_mg_dl",
+        "point_of_care_glucose_mg_dl",
+        "capillary_glucose_mg_dl",
+        "blood_glucose_mg_dl",
+        "blood_glucose",
+        "glucose_mg_dl",
+    )
+    glucose_fasting = _pick_float_value(row, "glucose_fasting_mg_dl", "fasting_glucose")
+    glucose_values = [value for value in (glucose_poc, glucose_fasting) if value is not None]
+    glucose_for_scoring = max(glucose_values) if glucose_values else None
+
+    warnings_list: list[str] = []
+    drivers: list[str] = []
+    if glucose_poc is not None and glucose_fasting is not None and abs(glucose_poc - glucose_fasting) > 50.0:
+        warnings_list.append(
+            f"Glucose conflict detected: POC glucose {glucose_poc:.1f} mg/dL and fasting glucose {glucose_fasting:.1f} mg/dL differ by more than 50 mg/dL; higher value used."
+        )
+        drivers.append(
+            f"Glucose conflict resolved using the higher value of {glucose_for_scoring:.1f} mg/dL."
+        )
+    elif glucose_for_scoring is not None:
+        drivers.append(f"Glucose input used for scoring: {glucose_for_scoring:.1f} mg/dL.")
+
+    creatinine = _pick_float_value(row, "creatinine_mg_dl", "creatinine", "serum_creatinine_mg_dl", "scr")
+    bun = _pick_float_value(row, "bun_mg_dl", "blood_urea_nitrogen_mg_dl", "urea_mg_dl", "urea")
+    hba1c = _pick_float_value(row, "hba1c_percent", "hba1c", "a1c")
+    systolic_bp = _pick_float_value(row, "systolic_bp_mmhg", "systolic_blood_pressure", "sbp")
+    spo2 = _pick_float_value(row, "spo2_percent", "spo2")
+
+    critical_reasons: list[str] = []
+    if glucose_for_scoring is not None and (glucose_for_scoring < 50.0 or glucose_for_scoring > 400.0):
+        critical_reasons.append(f"Blood glucose {glucose_for_scoring:.1f} mg/dL")
+    if creatinine is not None and creatinine > 2.0:
+        critical_reasons.append(f"Creatinine {creatinine:.2f} mg/dL")
+    if bun is not None and bun > 40.0:
+        critical_reasons.append(f"Urea/BUN {bun:.1f} mg/dL")
+    if systolic_bp is not None and (systolic_bp > 180.0 or systolic_bp < 80.0):
+        critical_reasons.append(f"Systolic BP {systolic_bp:.0f} mmHg")
+    if spo2 is not None and spo2 < 90.0:
+        critical_reasons.append(f"SpO2 {spo2:.0f}%")
+    if hba1c is not None and hba1c > 9.0:
+        critical_reasons.append(f"HbA1c {hba1c:.1f}%")
+
+    critical_override = bool(critical_reasons)
+    diabetes_present = any(
+        _normalize_comorbidity_token(token) in {"type 2 diabetes", "type ii diabetes", "type 2 dm", "t2d"}
+        for token in active_comorbidities
+    )
+    diabetes_lab_inconsistent = bool(diabetes_present and hba1c is not None and hba1c < 6.0)
+    if diabetes_lab_inconsistent:
+        warnings_list.append(
+            f"Clinical inconsistency detected: Type 2 Diabetes is present but HbA1c is {hba1c:.1f}%, so the low HbA1c was not allowed to reduce risk."
+        )
+        drivers.append("HbA1c was excluded from downward adjustment because diabetes is already documented.")
+
+    vitals_inputs = [
         _scale_to_unit_interval(pick("heart_rate_bpm", "heart_rate"), anchor=75.0, span=45.0),
-        _scale_to_unit_interval(pick("systolic_bp_mmhg", "systolic_blood_pressure"), anchor=120.0, span=50.0),
+        _scale_to_unit_interval(systolic_bp, anchor=120.0, span=50.0),
         _scale_to_unit_interval(pick("diastolic_bp_mmhg", "diastolic_blood_pressure"), anchor=80.0, span=30.0),
         _scale_to_unit_interval(pick("spo2_percent", "spo2"), anchor=97.0, span=15.0, invert=True),
         _scale_to_unit_interval(pick("body_temperature_c", "body_temperature"), anchor=37.0, span=2.0),
         _scale_to_unit_interval(pick("respiratory_rate_bpm", "respiratory_rate"), anchor=16.0, span=10.0),
         _scale_to_unit_interval(pick("bmi_kg_m2", "bmi"), anchor=22.0, span=18.0),
-    ])
-
-    labs = _mean_present([
-        _scale_to_unit_interval(pick("glucose_fasting_mg_dl", "fasting_glucose"), anchor=100.0, span=120.0),
+    ]
+    labs_inputs = [
+        _scale_to_unit_interval(glucose_for_scoring, anchor=100.0, span=120.0),
         _scale_to_unit_interval(pick("glucose_postprandial_mg_dl", "postprandial_glucose"), anchor=140.0, span=160.0),
-        _scale_to_unit_interval(pick("hba1c_percent", "hba1c"), anchor=5.7, span=4.3),
+        None if diabetes_lab_inconsistent else _scale_to_unit_interval(hba1c, anchor=5.7, span=4.3),
         _scale_to_unit_interval(pick("hemoglobin_g_dl", "hb_g_dl"), anchor=13.5, span=5.5, invert=True),
         _scale_to_unit_interval(pick("wbc_count_10e9_l", "wbc_count"), anchor=7.0, span=8.0),
         _scale_to_unit_interval(pick("platelets_10e9_l", "platelet_count"), anchor=250.0, span=180.0),
@@ -183,15 +364,14 @@ def _clinical_risk_component(
         _scale_to_unit_interval(pick("alt_u_l", "alt"), anchor=35.0, span=80.0),
         _scale_to_unit_interval(pick("ast_u_l", "ast"), anchor=35.0, span=80.0),
         _scale_to_unit_interval(pick("bilirubin_mg_dl", "bilirubin"), anchor=1.0, span=2.5),
-        _scale_to_unit_interval(pick("creatinine_mg_dl", "creatinine"), anchor=1.0, span=1.8),
-        _scale_to_unit_interval(pick("bun_mg_dl", "bun"), anchor=15.0, span=25.0),
+        _scale_to_unit_interval(creatinine, anchor=1.0, span=1.8),
+        _scale_to_unit_interval(bun, anchor=15.0, span=25.0),
         _scale_to_unit_interval(pick("egfr_ml_min_1_73m2", "egfr"), anchor=90.0, span=75.0, invert=True),
         _scale_to_unit_interval(pick("sodium_mmol_l", "sodium"), anchor=140.0, span=12.0),
         _scale_to_unit_interval(pick("potassium_mmol_l", "potassium"), anchor=4.2, span=2.0),
         _scale_to_unit_interval(pick("calcium_mg_dl", "calcium"), anchor=9.3, span=2.0),
-    ])
-
-    access = _mean_present([
+    ]
+    access_inputs = [
         _scale_to_unit_interval(pick("visits_last_90_days", "visits_in_last_90_days"), anchor=0.0, span=8.0),
         _scale_to_unit_interval(pick("symptom_duration_days", "symptom_duration"), anchor=0.0, span=14.0),
         _scale_to_unit_interval(pick("distance_to_nearest_facility_km", "distance_to_facility_km"), anchor=0.0, span=20.0),
@@ -200,7 +380,11 @@ def _clinical_risk_component(
         _scale_to_unit_interval(pick("sanitation_index"), anchor=1.0, span=1.0, invert=True),
         _scale_to_unit_interval(pick("drug_adherence_rate"), anchor=1.0, span=1.0, invert=True),
         _scale_to_unit_interval(pick("treatment_response_score"), anchor=1.0, span=1.0, invert=True),
-    ])
+    ]
+
+    vitals = _mean_present(vitals_inputs)
+    labs = _mean_present(labs_inputs)
+    access = _mean_present(access_inputs)
 
     weighted_components: list[tuple[float, float]] = [(anomaly_weight, _clamp_unit_interval(anomaly_score, default=0.0) or 0.0)]
     if vitals is not None:
@@ -211,8 +395,89 @@ def _clinical_risk_component(
         weighted_components.append((access_weight, access))
 
     total_weight = sum(weight for weight, _ in weighted_components)
-    blended_score = sum(weight * value for weight, value in weighted_components) / total_weight if total_weight > 0 else 0.0
-    return float(_generate_risk_score(blended_score))
+    base_score = sum(weight * value for weight, value in weighted_components) / total_weight if total_weight > 0 else 0.0
+    base_score = float(max(0.0, min(1.0, base_score)))
+
+    comorbidity_boost = min(high_risk_comorbidity_count * 0.08 + moderate_comorbidity_count * 0.04, 0.40)
+    if comorbidity_boost > 0:
+        drivers.append(
+            f"Comorbidity boost applied: +{comorbidity_boost:.2f} from {high_risk_comorbidity_count} high-risk and {moderate_comorbidity_count} moderate conditions."
+        )
+    elif active_comorbidity_count:
+        drivers.append(
+            f"{active_comorbidity_count} active comorbidities were present, but none matched the weighted high/moderate list."
+        )
+
+    adjusted_score = float(max(0.0, min(1.0, base_score + comorbidity_boost)))
+    risk_floor = 0.0
+    risk_floor_reason = "No minimum floor applied."
+    if active_comorbidity_count >= 8:
+        risk_floor = 0.65
+        risk_floor_reason = "Eight or more active comorbidities enforce a High-risk floor of 0.65."
+    elif active_comorbidity_count >= 5:
+        risk_floor = 0.55
+        risk_floor_reason = "Five to seven active comorbidities enforce a Medium-risk floor of 0.55."
+    elif active_comorbidity_count >= 3:
+        risk_floor = 0.40
+        risk_floor_reason = "Three to four active comorbidities enforce a Medium-risk floor of 0.40."
+
+    if critical_override:
+        risk_floor = max(risk_floor, 0.75)
+        risk_floor_reason = "Critical override applied because " + "; ".join(critical_reasons) + "."
+        warnings_list.append("Critical value override triggered: " + "; ".join(critical_reasons) + ".")
+        drivers.append("Critical override forced the score to at least 0.75.")
+
+    final_score = float(max(risk_floor, adjusted_score))
+    final_score = float(max(0.0, min(1.0, final_score)))
+    risk_category = _risk_category_from_score(final_score)
+    if critical_override and risk_category == "Low":
+        risk_category = "High"
+
+    risk_drivers = [
+        f"Base blended score from anomaly, vitals, labs, and access: {base_score:.2f}.",
+        f"Comorbidity boost: +{comorbidity_boost:.2f}.",
+        f"Minimum floor: {risk_floor:.2f}.",
+        risk_floor_reason,
+    ] + drivers
+    risk_summary = " ".join(risk_drivers)
+    if warnings_list:
+        risk_summary = f"{risk_summary} Warnings: {' | '.join(warnings_list)}"
+
+    return {
+        "clinical_risk_score_normalized": round(final_score, 4),
+        "risk_score_normalized": round(final_score, 4),
+        "clinical_risk_score": _generate_risk_score(final_score),
+        "risk_score": _generate_risk_score(final_score),
+        "risk_category": risk_category,
+        "risk_level": risk_category,
+        "alert_triggered": risk_category == "High",
+        "critical_override_triggered": critical_override,
+        "critical_override_reasons": critical_reasons,
+        "comorbidity_count": active_comorbidity_count,
+        "high_risk_comorbidity_count": high_risk_comorbidity_count,
+        "moderate_comorbidity_count": moderate_comorbidity_count,
+        "comorbidity_boost": round(comorbidity_boost, 4),
+        "risk_floor": round(risk_floor, 4),
+        "risk_floor_reason": risk_floor_reason,
+        "lab_conflict_warning": next((warning for warning in warnings_list if warning.startswith("Glucose conflict detected:")), None),
+        "clinical_inconsistency_warning": next((warning for warning in warnings_list if warning.startswith("Clinical inconsistency detected:")), None),
+        "risk_warnings": warnings_list,
+        "risk_drivers": risk_drivers,
+        "risk_summary": risk_summary,
+    }
+
+
+def _clinical_risk_component(
+    row: pd.Series | dict[str, Any],
+    *,
+    anomaly_score: float,
+    weights: dict[str, float] | None = None,
+) -> float:
+    """Blend anomaly output with vitals, labs, access barriers, and clinical rules."""
+
+    return float(
+        _clinical_risk_assessment(row, anomaly_score=anomaly_score, weights=weights)["risk_score"]
+    )
 
 
 def _estimate_object_size_bytes(obj: Any) -> int:
@@ -2279,14 +2544,20 @@ def score_records(pipeline, data: pd.DataFrame) -> pd.DataFrame:
         ),
         "Conformal calibration unavailable; falling back to raw anomaly score.",
     )
-    output["clinical_risk_score"] = output.apply(
-        lambda row: _clinical_risk_component(row, anomaly_score=float(row["anomaly_score"]), weights=risk_scoring_weights),
+    risk_assessment = output.apply(
+        lambda row: _clinical_risk_assessment(
+            row,
+            anomaly_score=float(row["anomaly_score"]),
+            weights=risk_scoring_weights,
+        ),
         axis=1,
+        result_type="expand",
     )
-    output["risk_score"] = output["clinical_risk_score"]
-    output["risk_category"] = output["risk_score"].apply(lambda value: _risk_category_from_score(float(value) / 100.0))
+    output = pd.concat([output, risk_assessment], axis=1)
+    output["clinical_risk_score"] = output["risk_score"]
+    output["risk_category"] = output["risk_score_normalized"].apply(lambda value: _risk_category_from_score(float(value)))
     output["risk_level"] = output["risk_category"]
-    output["alert_triggered"] = output["risk_category"].isin(["High", "Critical"])
+    output["alert_triggered"] = output["risk_category"].eq("High")
     output["drift_alert_triggered"] = output["score_stream_drift_alarm"]
     output["staleness_alert_triggered"] = output["distribution_staleness_alarm"]
     output["drift_assessment"] = np.where(
